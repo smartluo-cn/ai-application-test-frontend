@@ -22,7 +22,7 @@ const menuItems = [
   { index: '4', title: '环境管理', icon: 'Setting', route: '/environment' },
   { index: '5', title: '插件管理', icon: 'Connection', route: '/plugin' },
   { index: '6', title: '测试执行', icon: 'VideoPlay', route: '/execution' },
-  { index: '7', title: '测试结果', icon: 'DataAnalysis', route: '/result' },
+  { index: '7', title: '测试报告', icon: 'DataAnalysis', route: '/result' },
 ]
 
 const iconComponents = {

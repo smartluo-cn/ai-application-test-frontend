@@ -61,7 +61,7 @@ const router = createRouter({
           path: 'result',
           name: 'result',
           component: () => import('@/views/result/ResultView.vue'),
-          meta: { title: '测试结果' },
+          meta: { title: '测试报告' },
         },
       ],
     },

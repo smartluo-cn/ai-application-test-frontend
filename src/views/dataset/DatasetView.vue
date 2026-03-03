@@ -11,6 +11,7 @@ import {
   Document,
   ChatDotRound,
   Cpu,
+  Search,
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -24,15 +25,36 @@ const editingId = ref('')
 // 对话框标题
 const dialogTitle = computed(() => (isEditMode.value ? '编辑测评集' : '新建测评集'))
 
+// 搜索和筛选
+const searchKeyword = ref('')
+const selectedTestType = ref('all')
+
 // 表单数据
 const formData = reactive({
   name: '',
   iconType: 'preset',
   icon: 'ChatDotRound',
   customIconUrl: '',
+  testType: 'objective',
   tags: [],
   description: '',
 })
+
+// 测试类型选项
+const testTypeOptions = [
+  { value: 'objective', label: '客观题' },
+  { value: 'subjective', label: '主观题' },
+]
+
+// 获取测试类型文本
+const getTestTypeText = (testType) => {
+  return testType === 'subjective' ? '主观题' : '客观题'
+}
+
+// 获取测试类型标签类型
+const getTestTypeTagType = (testType) => {
+  return testType === 'subjective' ? 'warning' : ''
+}
 
 // 预置标签列表
 const presetTags = [
@@ -83,6 +105,7 @@ const formRules = {
     { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' },
   ],
   icon: [{ required: true, message: '请选择图标', trigger: 'change' }],
+  testType: [{ required: true, message: '请选择测试类型', trigger: 'change' }],
   description: [
     { required: true, message: '请输入测评集描述', trigger: 'blur' },
     { min: 10, max: 200, message: '长度在 10 到 200 个字符', trigger: 'blur' },
@@ -114,6 +137,7 @@ const openEditDialog = (dataset) => {
   formData.iconType = dataset.iconType
   formData.icon = dataset.icon || 'ChatDotRound'
   formData.customIconUrl = dataset.customIconUrl || ''
+  formData.testType = dataset.testType || 'objective'
   formData.tags = [...dataset.tags]
   formData.description = dataset.description
   dialogVisible.value = true
@@ -125,6 +149,7 @@ const resetForm = () => {
   formData.iconType = 'preset'
   formData.icon = 'ChatDotRound'
   formData.customIconUrl = ''
+  formData.testType = 'objective'
   formData.tags = []
   formData.description = ''
   formRef.value?.resetFields()
@@ -177,6 +202,7 @@ const handleSubmit = async () => {
               icon: formData.iconType === 'preset' ? formData.icon : '',
               customIconUrl:
                 formData.iconType === 'custom' ? formData.customIconUrl : undefined,
+              testType: formData.testType,
               tags: [...formData.tags],
               description: formData.description,
               dataCount: original.dataCount,
@@ -195,6 +221,7 @@ const handleSubmit = async () => {
           icon: formData.iconType === 'preset' ? formData.icon : '',
           customIconUrl:
             formData.iconType === 'custom' ? formData.customIconUrl : undefined,
+          testType: formData.testType,
           tags: [...formData.tags],
           description: formData.description,
           dataCount: 0,
@@ -318,6 +345,7 @@ const confirmSplit = () => {
     icon: currentSplitDataset.value.icon,
     iconType: currentSplitDataset.value.iconType,
     customIconUrl: currentSplitDataset.value.customIconUrl,
+    testType: currentSplitDataset.value.testType,
     tags: [...currentSplitDataset.value.tags],
     description: `从「${currentSplitDataset.value.name}」拆分而来`,
     dataCount: count1,
@@ -331,6 +359,7 @@ const confirmSplit = () => {
     icon: currentSplitDataset.value.icon,
     iconType: currentSplitDataset.value.iconType,
     customIconUrl: currentSplitDataset.value.customIconUrl,
+    testType: currentSplitDataset.value.testType,
     tags: [...currentSplitDataset.value.tags],
     description: `从「${currentSplitDataset.value.name}」拆分而来`,
     dataCount: count2,
@@ -359,6 +388,7 @@ const allDatasets = ref([
     name: '通用对话测评集',
     icon: 'ChatDotRound',
     iconType: 'preset',
+    testType: 'objective',
     tags: ['对话', '通用'],
     description:
       '包含多轮对话、常识问答等通用场景的测试数据，用于评估模型的对话能力',
@@ -371,6 +401,7 @@ const allDatasets = ref([
     name: '代码生成测评集',
     icon: 'Cpu',
     iconType: 'preset',
+    testType: 'objective',
     tags: ['代码', '编程'],
     description:
       '包含多种编程语言的代码生成任务，用于评估模型的编程能力',
@@ -383,6 +414,7 @@ const allDatasets = ref([
     name: '文档理解测评集',
     icon: 'Document',
     iconType: 'preset',
+    testType: 'objective',
     tags: ['文档', '理解'],
     description:
       '包含长文档阅读理解、信息提取等任务，用于评估模型的文档处理能力',
@@ -395,6 +427,7 @@ const allDatasets = ref([
     name: '数据分析测评集',
     icon: 'DataAnalysis',
     iconType: 'preset',
+    testType: 'objective',
     tags: ['数据', '分析'],
     description:
       '包含数据解读、图表分析、统计推理等任务，用于评估模型的数据分析能力',
@@ -407,6 +440,7 @@ const allDatasets = ref([
     name: '数学推理测评集',
     icon: 'DataAnalysis',
     iconType: 'preset',
+    testType: 'objective',
     tags: ['数学', '推理'],
     description: '包含数学计算、逻辑推理等任务，用于评估模型的数学能力',
     dataCount: 180,
@@ -418,6 +452,7 @@ const allDatasets = ref([
     name: '翻译能力测评集',
     icon: 'ChatDotRound',
     iconType: 'preset',
+    testType: 'subjective',
     tags: ['翻译', '多语言'],
     description: '包含多语言翻译任务，用于评估模型的跨语言处理能力',
     dataCount: 320,
@@ -429,6 +464,7 @@ const allDatasets = ref([
     name: '创意写作测评集',
     icon: 'Document',
     iconType: 'preset',
+    testType: 'subjective',
     tags: ['写作', '创意'],
     description: '包含故事创作、文案生成等任务，用于评估模型的创意写作能力',
     dataCount: 88,
@@ -440,6 +476,7 @@ const allDatasets = ref([
     name: '知识问答测评集',
     icon: 'Cpu',
     iconType: 'preset',
+    testType: 'objective',
     tags: ['知识', '问答'],
     description: '包含各领域知识问答，用于评估模型的知识广度',
     dataCount: 450,
@@ -451,6 +488,7 @@ const allDatasets = ref([
     name: '情感分析测评集',
     icon: 'ChatDotRound',
     iconType: 'preset',
+    testType: 'objective',
     tags: ['情感', 'NLP'],
     description: '包含文本情感分类、情绪识别等任务，用于评估模型的情感理解能力',
     dataCount: 200,
@@ -462,6 +500,7 @@ const allDatasets = ref([
     name: '摘要生成测评集',
     icon: 'Document',
     iconType: 'preset',
+    testType: 'subjective',
     tags: ['摘要', '生成'],
     description: '包含新闻摘要、论文摘要等任务，用于评估模型的文本摘要能力',
     dataCount: 156,
@@ -473,6 +512,7 @@ const allDatasets = ref([
     name: '问答系统测评集',
     icon: 'ChatDotRound',
     iconType: 'preset',
+    testType: 'objective',
     tags: ['问答', '检索'],
     description:
       '包含基于上下文的问答任务，用于评估模型的阅读理解和信息提取能力',
@@ -485,6 +525,7 @@ const allDatasets = ref([
     name: 'SQL生成测评集',
     icon: 'Cpu',
     iconType: 'preset',
+    testType: 'objective',
     tags: ['SQL', '数据库'],
     description: '包含自然语言转SQL的任务，用于评估模型的数据库查询生成能力',
     dataCount: 120,
@@ -496,6 +537,7 @@ const allDatasets = ref([
     name: '文本分类测评集',
     icon: 'Document',
     iconType: 'preset',
+    testType: 'objective',
     tags: ['分类', 'NLP'],
     description: '包含新闻分类、意图识别等任务，用于评估模型的文本分类能力',
     dataCount: 280,
@@ -507,6 +549,7 @@ const allDatasets = ref([
     name: '命名实体识别测评集',
     icon: 'DataAnalysis',
     iconType: 'preset',
+    testType: 'objective',
     tags: ['NER', 'NLP'],
     description:
       '包含人名、地名、机构名等实体识别任务，用于评估模型的实体抽取能力',
@@ -519,6 +562,7 @@ const allDatasets = ref([
     name: '对话状态追踪测评集',
     icon: 'ChatDotRound',
     iconType: 'preset',
+    testType: 'subjective',
     tags: ['对话', '状态'],
     description: '包含多轮对话状态追踪任务，用于评估模型的对话管理能力',
     dataCount: 92,
@@ -530,6 +574,7 @@ const allDatasets = ref([
     name: '文本纠错测评集',
     icon: 'Document',
     iconType: 'preset',
+    testType: 'objective',
     tags: ['纠错', 'NLP'],
     description: '包含拼写纠错、语法纠错等任务，用于评估模型的文本校对能力',
     dataCount: 210,
@@ -541,6 +586,7 @@ const allDatasets = ref([
     name: '机器阅读理解测评集',
     icon: 'Document',
     iconType: 'preset',
+    testType: 'objective',
     tags: ['阅读', '理解'],
     description: '包含篇章级阅读理解任务，用于评估模型的深度理解能力',
     dataCount: 340,
@@ -552,6 +598,7 @@ const allDatasets = ref([
     name: '代码补全测评集',
     icon: 'Cpu',
     iconType: 'preset',
+    testType: 'objective',
     tags: ['代码', '补全'],
     description: '包含代码自动补全任务，用于评估模型的代码预测能力',
     dataCount: 165,
@@ -563,6 +610,7 @@ const allDatasets = ref([
     name: '关键词提取测评集',
     icon: 'DataAnalysis',
     iconType: 'preset',
+    testType: 'objective',
     tags: ['关键词', 'NLP'],
     description: '包含文本关键词提取任务，用于评估模型的信息提取能力',
     dataCount: 145,
@@ -574,6 +622,7 @@ const allDatasets = ref([
     name: '文本相似度测评集',
     icon: 'ChatDotRound',
     iconType: 'preset',
+    testType: 'objective',
     tags: ['相似度', '匹配'],
     description: '包含文本匹配、相似度计算任务，用于评估模型的语义理解能力',
     dataCount: 188,
@@ -585,6 +634,7 @@ const allDatasets = ref([
     name: '图像描述生成测评集',
     icon: 'Document',
     iconType: 'preset',
+    testType: 'subjective',
     tags: ['图像', '多模态'],
     description: '包含图像内容描述任务，用于评估模型的多模态理解能力',
     dataCount: 78,
@@ -596,6 +646,7 @@ const allDatasets = ref([
     name: '逻辑推理测评集',
     icon: 'Cpu',
     iconType: 'preset',
+    testType: 'objective',
     tags: ['逻辑', '推理'],
     description: '包含逻辑推理、因果分析等任务，用于评估模型的逻辑思维能力',
     dataCount: 112,
@@ -607,6 +658,7 @@ const allDatasets = ref([
     name: '常识推理测评集',
     icon: 'DataAnalysis',
     iconType: 'preset',
+    testType: 'objective',
     tags: ['常识', '推理'],
     description: '包含日常生活常识推理任务，用于评估模型的常识判断能力',
     dataCount: 225,
@@ -618,6 +670,7 @@ const allDatasets = ref([
     name: '文本生成测评集',
     icon: 'Document',
     iconType: 'preset',
+    testType: 'subjective',
     tags: ['生成', 'NLP'],
     description: '包含续写、扩写等文本生成任务，用于评估模型的生成能力',
     dataCount: 198,
@@ -629,6 +682,7 @@ const allDatasets = ref([
     name: 'API调用测评集',
     icon: 'Cpu',
     iconType: 'preset',
+    testType: 'objective',
     tags: ['API', '工具'],
     description: '包含API调用决策和参数生成任务，用于评估模型的工具使用能力',
     dataCount: 86,
@@ -637,14 +691,36 @@ const allDatasets = ref([
   },
 ])
 
+// 过滤后的数据
+const filteredDatasets = computed(() => {
+  let result = allDatasets.value
+
+  // 测试类型筛选
+  if (selectedTestType.value !== 'all') {
+    result = result.filter(d => d.testType === selectedTestType.value)
+  }
+
+  // 关键词搜索
+  if (searchKeyword.value) {
+    const keyword = searchKeyword.value.toLowerCase()
+    result = result.filter(d =>
+      d.name.toLowerCase().includes(keyword) ||
+      d.description.toLowerCase().includes(keyword) ||
+      d.tags.some(t => t.toLowerCase().includes(keyword))
+    )
+  }
+
+  return result
+})
+
 // 总数
-const total = computed(() => allDatasets.value.length)
+const total = computed(() => filteredDatasets.value.length)
 
 // 当前页数据
 const datasets = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
   const end = start + pageSize.value
-  return allDatasets.value.slice(start, end)
+  return filteredDatasets.value.slice(start, end)
 })
 
 // 图标映射
@@ -685,6 +761,23 @@ const handleSizeChange = (size) => {
       >
     </div>
 
+    <!-- 搜索和筛选 -->
+    <div class="filter-bar">
+      <el-input
+        v-model="searchKeyword"
+        placeholder="搜索测评集名称、标签或描述"
+        :prefix-icon="Search"
+        clearable
+        style="width: 300px"
+        @input="currentPage = 1"
+      />
+      <el-select v-model="selectedTestType" placeholder="测试类型" style="width: 120px" @change="currentPage = 1">
+        <el-option label="全部类型" value="all" />
+        <el-option label="客观题" value="objective" />
+        <el-option label="主观题" value="subjective" />
+      </el-select>
+    </div>
+
     <!-- 测评集卡片列表 -->
     <div class="dataset-grid">
       <el-card
@@ -709,6 +802,13 @@ const handleSizeChange = (size) => {
           <div class="title-area">
             <h3 class="dataset-name">{{ dataset.name }}</h3>
             <div class="tags">
+              <el-tag
+                :type="getTestTypeTagType(dataset.testType)"
+                size="small"
+                effect="plain"
+              >
+                {{ getTestTypeText(dataset.testType) }}
+              </el-tag>
               <el-tag
                 v-for="tag in dataset.tags"
                 :key="tag"
@@ -870,6 +970,26 @@ const handleSizeChange = (size) => {
           </el-select>
         </el-form-item>
 
+        <el-form-item label="测试类型" prop="testType">
+          <el-radio-group v-model="formData.testType">
+            <el-radio-button
+              v-for="option in testTypeOptions"
+              :key="option.value"
+              :value="option.value"
+            >
+              {{ option.label }}
+            </el-radio-button>
+          </el-radio-group>
+          <div class="test-type-tip">
+            <template v-if="formData.testType === 'objective'">
+              客观题：有标准答案，可自动判定通过/失败
+            </template>
+            <template v-else>
+              主观题：无标准答案，需人工评估
+            </template>
+          </div>
+        </el-form-item>
+
         <el-form-item label="描述" prop="description">
           <el-input
             v-model="formData.description"
@@ -1006,6 +1126,13 @@ const handleSizeChange = (size) => {
 .dataset-count {
   font-size: 14px;
   color: #909399;
+}
+
+/* 筛选栏 */
+.filter-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
 }
 
 .dataset-grid {
@@ -1228,6 +1355,12 @@ const handleSizeChange = (size) => {
 }
 
 .upload-tip {
+  font-size: 12px;
+  color: #909399;
+}
+
+.test-type-tip {
+  margin-top: 8px;
   font-size: 12px;
   color: #909399;
 }
