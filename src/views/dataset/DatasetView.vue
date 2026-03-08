@@ -12,9 +12,150 @@ import {
   ChatDotRound,
   Cpu,
   Search,
+  Collection,
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
+
+// 当前标签页
+const activeTab = ref('datasets')
+
+// 数据字典列表
+const dataDictionaries = ref([
+  {
+    id: 'dict-1',
+    name: '通用对话测试',
+    description: '用于测试模型的基础对话能力，包含多轮对话、意图识别等测试场景',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'input', label: '输入', type: 'string' },
+      { key: 'expectedOutput', label: '期望输出', type: 'string' },
+      { key: 'category', label: '分类', type: 'enum', enumOptions: ['问候', '询问', '建议', '闲聊', '投诉', '咨询'] },
+      { key: 'difficulty', label: '难度', type: 'enum', enumOptions: ['简单', '中等', '困难'] },
+    ],
+    createdAt: '2024-01-15',
+    updatedAt: '2024-02-20',
+  },
+  {
+    id: 'dict-2',
+    name: '代码生成测试',
+    description: '用于测试模型的代码生成能力，包含 Python、Java、SQL 等编程语言的代码生成测试',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'prompt', label: '提示词', type: 'string' },
+      { key: 'expectedCode', label: '期望代码', type: 'string' },
+      { key: 'language', label: '编程语言', type: 'enum', enumOptions: ['Python', 'Java', 'JavaScript', 'SQL', 'Go'] },
+      { key: 'complexity', label: '复杂度', type: 'enum', enumOptions: ['简单', '中等', '复杂'] },
+    ],
+    createdAt: '2024-02-01',
+    updatedAt: '2024-02-15',
+  },
+  {
+    id: 'dict-3',
+    name: '文本摘要测试',
+    description: '用于测试模型的文本摘要能力，包含长文本的摘要生成测试',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'originalText', label: '原文', type: 'string' },
+      { key: 'expectedSummary', label: '期望摘要', type: 'string' },
+      { key: 'maxLength', label: '最大长度', type: 'number' },
+    ],
+    createdAt: '2024-02-25',
+    updatedAt: '2024-02-26',
+  },
+  {
+    id: 'dict-4',
+    name: '问答测试',
+    description: '用于测试模型的问答能力，包含知识问答、推理问答等测试场景',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'question', label: '问题', type: 'string' },
+      { key: 'expectedAnswer', label: '期望答案', type: 'string' },
+      { key: 'domain', label: '领域', type: 'enum', enumOptions: ['科技', '历史', '地理', '文化', '科学'] },
+      { key: 'difficulty', label: '难度', type: 'enum', enumOptions: ['简单', '中等', '困难'] },
+    ],
+    createdAt: '2024-02-10',
+    updatedAt: '2024-02-18',
+  },
+  {
+    id: 'dict-5',
+    name: '情感分析测试',
+    description: '用于测试模型的情感分析能力，包含正面、负面、中性情感的文本分析',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'text', label: '文本', type: 'string' },
+      { key: 'expectedSentiment', label: '期望情感', type: 'enum', enumOptions: ['正面', '负面', '中性'] },
+      { key: 'confidence', label: '置信度阈值', type: 'number' },
+    ],
+    createdAt: '2024-01-20',
+    updatedAt: '2024-02-10',
+  },
+  {
+    id: 'dict-6',
+    name: '翻译测试',
+    description: '用于测试模型的翻译能力，包含中英互译、多语言翻译等测试场景',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'sourceText', label: '源文本', type: 'string' },
+      { key: 'expectedTranslation', label: '期望翻译', type: 'string' },
+      { key: 'sourceLanguage', label: '源语言', type: 'enum', enumOptions: ['中文', '英文', '日文', '韩文'] },
+      { key: 'targetLanguage', label: '目标语言', type: 'enum', enumOptions: ['中文', '英文', '日文', '韩文'] },
+    ],
+    createdAt: '2024-02-10',
+    updatedAt: '2024-02-18',
+  },
+  {
+    id: 'dict-7',
+    name: '关键词提取测试',
+    description: '用于测试模型的关键词提取能力，从文本中提取关键信息',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'text', label: '文本', type: 'string' },
+      { key: 'expectedKeywords', label: '期望关键词', type: 'string' },
+      { key: 'maxKeywords', label: '最大关键词数', type: 'number' },
+    ],
+    createdAt: '2024-02-28',
+    updatedAt: '2024-02-28',
+  },
+  {
+    id: 'dict-8',
+    name: '文本相似度测试',
+    description: '用于测试模型的文本相似度计算能力，判断两段文本的相似程度',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'text1', label: '文本1', type: 'string' },
+      { key: 'text2', label: '文本2', type: 'string' },
+      { key: 'expectedSimilarity', label: '期望相似度', type: 'number' },
+    ],
+    createdAt: '2024-01-20',
+    updatedAt: '2024-02-10',
+  },
+])
+
+// 数据字典搜索
+const dictSearchKeyword = ref('')
+
+// 过滤后的数据字典
+const filteredDictionaries = computed(() => {
+  if (!dictSearchKeyword.value) {
+    return dataDictionaries.value
+  }
+  const keyword = dictSearchKeyword.value.toLowerCase()
+  return dataDictionaries.value.filter(dict =>
+    dict.name.toLowerCase().includes(keyword) ||
+    dict.description.toLowerCase().includes(keyword)
+  )
+})
+
+// 获取列类型显示文本
+const getColumnTypeText = (type) => {
+  const typeMap = {
+    string: '字符串',
+    number: '数字',
+    enum: '枚举',
+  }
+  return typeMap[type] || type
+}
 
 // 对话框控制
 const dialogVisible = ref(false)
@@ -754,31 +895,33 @@ const handleSizeChange = (size) => {
     <div class="page-header">
       <div class="header-left">
         <h2>测评集管理</h2>
-        <span class="dataset-count">共 {{ total }} 个测评集</span>
       </div>
-      <el-button type="primary" :icon="Plus" @click="openCreateDialog"
+      <el-button v-if="activeTab === 'datasets'" type="primary" :icon="Plus" @click="openCreateDialog"
         >新建测评集</el-button
       >
     </div>
 
-    <!-- 搜索和筛选 -->
-    <div class="filter-bar">
-      <el-input
-        v-model="searchKeyword"
-        placeholder="搜索测评集名称、标签或描述"
-        :prefix-icon="Search"
-        clearable
-        style="width: 300px"
-        @input="currentPage = 1"
-      />
-      <el-select v-model="selectedTestType" placeholder="测试类型" style="width: 120px" @change="currentPage = 1">
-        <el-option label="全部类型" value="all" />
-        <el-option label="客观题" value="objective" />
-        <el-option label="主观题" value="subjective" />
-      </el-select>
-    </div>
+    <!-- 标签页切换 -->
+    <el-tabs v-model="activeTab" class="page-tabs">
+      <el-tab-pane label="测评集" name="datasets">
+        <!-- 搜索和筛选 -->
+        <div class="filter-bar">
+          <el-input
+            v-model="searchKeyword"
+            placeholder="搜索测评集名称、标签或描述"
+            :prefix-icon="Search"
+            clearable
+            style="width: 300px"
+            @input="currentPage = 1"
+          />
+          <el-select v-model="selectedTestType" placeholder="测试类型" style="width: 120px" @change="currentPage = 1">
+            <el-option label="全部类型" value="all" />
+            <el-option label="客观题" value="objective" />
+            <el-option label="主观题" value="subjective" />
+          </el-select>
+        </div>
 
-    <!-- 测评集卡片列表 -->
+        <!-- 测评集卡片列表 -->
     <div class="dataset-grid">
       <el-card
         v-for="dataset in datasets"
@@ -867,17 +1010,95 @@ const handleSizeChange = (size) => {
     />
 
     <!-- 分页 -->
-    <div class="pagination-wrapper" v-if="total > 0">
-      <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
-        :page-sizes="[10, 20, 50, 100]"
-        :total="total"
-        layout="total, sizes, prev, pager, next, jumper"
-        @size-change="handleSizeChange"
-        @current-change="handlePageChange"
-      />
-    </div>
+        <div class="pagination-wrapper" v-if="total > 0">
+          <el-pagination
+            v-model:current-page="currentPage"
+            v-model:page-size="pageSize"
+            :page-sizes="[10, 20, 50, 100]"
+            :total="total"
+            layout="total, sizes, prev, pager, next, jumper"
+            @size-change="handleSizeChange"
+            @current-change="handlePageChange"
+          />
+        </div>
+      </el-tab-pane>
+
+      <!-- 数据字典标签页 -->
+      <el-tab-pane label="数据字典" name="dictionaries">
+        <!-- 搜索栏 -->
+        <div class="filter-bar">
+          <el-input
+            v-model="dictSearchKeyword"
+            placeholder="搜索数据字典名称或描述"
+            :prefix-icon="Search"
+            clearable
+            style="width: 300px"
+          />
+        </div>
+
+        <!-- 数据字典卡片列表 -->
+        <div class="dataset-grid">
+          <el-card
+            v-for="dict in filteredDictionaries"
+            :key="dict.id"
+            class="dataset-card"
+            shadow="hover"
+          >
+            <!-- 卡片头部 -->
+            <div class="card-header">
+              <div class="icon-wrapper" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <el-icon :size="32" color="#fff"><Collection /></el-icon>
+              </div>
+              <div class="title-area">
+                <h3 class="dataset-name">{{ dict.name }}</h3>
+                <div class="tags">
+                  <el-tag size="small" type="info">
+                    {{ dict.columns.length }} 个字段
+                  </el-tag>
+                </div>
+              </div>
+            </div>
+
+            <!-- 卡片内容 -->
+            <div class="card-content">
+              <p class="description">{{ dict.description }}</p>
+            </div>
+
+            <!-- 字段列表 -->
+            <div class="columns-preview">
+              <div class="preview-title">字段定义</div>
+              <div class="columns-list">
+                <el-tag
+                  v-for="col in dict.columns.slice(0, 4)"
+                  :key="col.key"
+                  size="small"
+                  :type="col.type === 'enum' ? 'warning' : 'info'"
+                  effect="plain"
+                >
+                  {{ col.label }} ({{ getColumnTypeText(col.type) }})
+                </el-tag>
+                <el-tag v-if="dict.columns.length > 4" size="small" type="info" effect="plain">
+                  +{{ dict.columns.length - 4 }} 更多
+                </el-tag>
+              </div>
+            </div>
+
+            <!-- 卡片底部 -->
+            <div class="card-footer">
+              <div class="data-info">
+                <span class="time-text">创建于 {{ dict.createdAt }}</span>
+              </div>
+            </div>
+          </el-card>
+        </div>
+
+        <!-- 空状态 -->
+        <el-empty
+          v-if="filteredDictionaries.length === 0"
+          description="暂无数据字典"
+        />
+      </el-tab-pane>
+    </el-tabs>
 
     <!-- 新建测评集对话框 -->
     <el-dialog
