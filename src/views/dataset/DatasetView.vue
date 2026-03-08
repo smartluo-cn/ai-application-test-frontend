@@ -1353,13 +1353,19 @@ const handleSizeChange = (size) => {
               :key="index"
               class="column-item"
             >
-              <el-input v-model="column.key" placeholder="字段key" style="width: 120px" />
-              <el-input v-model="column.label" placeholder="字段名称" style="width: 120px" />
-              <el-select v-model="column.type" placeholder="类型" style="width: 100px">
+              <el-input v-model="column.key" placeholder="字段key" style="width: 100px" />
+              <el-input v-model="column.label" placeholder="字段名称" style="width: 100px" />
+              <el-select v-model="column.type" placeholder="类型" style="width: 90px">
                 <el-option label="字符串" value="string" />
                 <el-option label="数字" value="number" />
                 <el-option label="枚举" value="enum" />
               </el-select>
+              <el-input
+                v-if="column.type === 'enum'"
+                v-model="column.enumOptions"
+                placeholder="枚举值(逗号分隔)"
+                style="width: 150px"
+              />
               <el-button
                 v-if="dictionaryForm.columns.length > 1"
                 type="danger"
