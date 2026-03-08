@@ -1361,6 +1361,20 @@ const handleSizeChange = (size) => {
                 <el-option label="枚举" value="enum" />
               </el-select>
               <el-input
+                v-if="column.type === 'number'"
+                v-model="column.min"
+                placeholder="最小值"
+                style="width: 80px"
+                type="number"
+              />
+              <el-input
+                v-if="column.type === 'number'"
+                v-model="column.max"
+                placeholder="最大值"
+                style=" 80px"
+                type="number"
+              />
+              <el-input
                 v-if="column.type === 'enum'"
                 v-model="column.enumOptions"
                 placeholder="枚举值(逗号分隔)"
