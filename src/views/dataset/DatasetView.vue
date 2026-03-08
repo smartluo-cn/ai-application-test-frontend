@@ -1602,4 +1602,30 @@ const handleSizeChange = (size) => {
   font-size: 13px;
   color: #909399;
 }
+
+/* 数据字典卡片样式 */
+.columns-preview {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.preview-title {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 8px;
+}
+
+.columns-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 60px;
+  overflow: hidden;
+}
+
+.time-text {
+  font-size: 13px;
+  color: #909399;
+}
 </style>
