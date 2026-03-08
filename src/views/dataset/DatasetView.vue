@@ -143,8 +143,25 @@ const filteredDictionaries = computed(() => {
   const keyword = dictSearchKeyword.value.toLowerCase()
   return dataDictionaries.value.filter(dict =>
     dict.name.toLowerCase().includes(keyword) ||
-    dict.description.toLowerCase().includes(keyword)
+    dict.columns.some(col =>
+      col.key.toLowerCase().includes(keyword) ||
+      col.label.toLowerCase().includes(keyword)
+    )
   )
+})
+
+// 数据字典分页
+const dictCurrentPage = ref(1)
+const dictPageSize = ref(10)
+
+// 数据字典总数
+const dictTotal = computed(() => filteredDictionaries.value.length)
+
+// 当前页的数据字典
+const paginatedDictionaries = computed(() => {
+  const start = (dictCurrentPage.value - 1) * dictPageSize.value
+  const end = start + dictPageSize.value
+  return filteredDictionaries.value.slice(start, end)
 })
 
 // 获取列类型显示文本
@@ -291,25 +308,44 @@ const removeDictionaryColumn = (index) => {
 const handleDictionarySubmit = async () => {
   if (!dictionaryFormRef.value) return
 
-  await dictionaryFormRef.value.validate((valid) => {
-    if (valid) {
-      // 过滤掉空的字段
-      const columns = dictionaryForm.columns.filter(col => col.key && col.label)
+  try {
+    // 验证表单基础字段
+    await dictionaryFormRef.value.validate()
 
-      const newDictionary = {
-        id: `dict-${Date.now()}`,
-        name: dictionaryForm.name,
-        columns: columns,
-        createdAt: new Date().toISOString().slice(0, 10),
-        updatedAt: new Date().toISOString().slice(0, 10),
-      }
-
-      dataDictionaries.value.unshift(newDictionary)
-      formData.dictionaryId = newDictionary.id
-      dictionaryDialogVisible.value = false
-      ElMessage.success('数据字典创建成功')
+    // 验证字段：至少1个字段
+    if (dictionaryForm.columns.length === 0) {
+      ElMessage.warning('请至少添加1个字段')
+      return
     }
-  })
+
+    // 验证所有字段的key和label都必填
+    const hasEmptyField = dictionaryForm.columns.some(col => !col.key?.trim() || !col.label?.trim())
+    if (hasEmptyField) {
+      ElMessage.warning('请填写所有字段的Key和名称')
+      return
+    }
+
+    const newDictionary = {
+      id: `dict-${Date.now()}`,
+      name: dictionaryForm.name,
+      columns: dictionaryForm.columns.map(col => ({
+        key: col.key.trim(),
+        label: col.label.trim(),
+        type: col.type,
+        ...(col.type === 'number' && { min: col.min, max: col.max }),
+        ...(col.type === 'enum' && { enumOptions: col.enumOptions }),
+      })),
+      createdAt: new Date().toISOString().slice(0, 10),
+      updatedAt: new Date().toISOString().slice(0, 10),
+    }
+
+    dataDictionaries.value.unshift(newDictionary)
+    formData.dictionaryId = newDictionary.id
+    dictionaryDialogVisible.value = false
+    ElMessage.success('数据字典创建成功')
+  } catch {
+    // 表单验证失败，Element Plus 会自动显示错误提示
+  }
 }
 
 // 表单验证规则
@@ -962,6 +998,16 @@ const handleSizeChange = (size) => {
   pageSize.value = size
   currentPage.value = 1
 }
+
+// 数据字典分页处理
+const handleDictPageChange = (page) => {
+  dictCurrentPage.value = page
+}
+
+const handleDictSizeChange = (size) => {
+  dictPageSize.value = size
+  dictCurrentPage.value = 1
+}
 </script>
 
 <template>
@@ -973,6 +1019,9 @@ const handleSizeChange = (size) => {
       </div>
       <el-button v-if="activeTab === 'datasets'" type="primary" :icon="Plus" @click="openCreateDialog"
         >新建测评集</el-button
+      >
+      <el-button v-else type="primary" :icon="Plus" @click="openCreateDictionaryDialog"
+        >新建数据字典</el-button
       >
     </div>
 
@@ -1104,17 +1153,18 @@ const handleSizeChange = (size) => {
         <div class="filter-bar">
           <el-input
             v-model="dictSearchKeyword"
-            placeholder="搜索数据字典名称或描述"
+            placeholder="搜索数据字典名称或字段"
             :prefix-icon="Search"
             clearable
             style="width: 300px"
+            @input="dictCurrentPage = 1"
           />
         </div>
 
         <!-- 数据字典卡片列表 -->
         <div class="dataset-grid">
           <el-card
-            v-for="dict in filteredDictionaries"
+            v-for="dict in paginatedDictionaries"
             :key="dict.id"
             class="dataset-card"
             shadow="hover"
@@ -1164,9 +1214,22 @@ const handleSizeChange = (size) => {
 
         <!-- 空状态 -->
         <el-empty
-          v-if="filteredDictionaries.length === 0"
+          v-if="paginatedDictionaries.length === 0"
           description="暂无数据字典"
         />
+
+        <!-- 分页 -->
+        <div class="pagination-wrapper" v-if="dictTotal > 0">
+          <el-pagination
+            v-model:current-page="dictCurrentPage"
+            v-model:page-size="dictPageSize"
+            :page-sizes="[10, 20, 50, 100]"
+            :total="dictTotal"
+            layout="total, sizes, prev, pager, next, jumper"
+            @size-change="handleDictSizeChange"
+            @current-change="handleDictPageChange"
+          />
+        </div>
       </el-tab-pane>
     </el-tabs>
 
@@ -1353,44 +1416,68 @@ const handleSizeChange = (size) => {
               :key="index"
               class="column-item"
             >
-              <el-input v-model="column.key" placeholder="字段key" style="width: 100px" />
-              <el-input v-model="column.label" placeholder="字段名称" style="width: 100px" />
-              <el-select v-model="column.type" placeholder="类型" style="width: 90px">
-                <el-option label="字符串" value="string" />
-                <el-option label="数字" value="number" />
-                <el-option label="枚举" value="enum" />
-              </el-select>
-              <el-input
-                v-if="column.type === 'number'"
-                v-model="column.min"
-                placeholder="最小值"
-                style="width: 80px"
-                type="number"
-              />
-              <el-input
-                v-if="column.type === 'number'"
-                v-model="column.max"
-                placeholder="最大值"
-                style="width: 80px"
-                type="number"
-              />
-              <el-input
-                v-if="column.type === 'enum'"
-                v-model="column.enumOptions"
-                placeholder="枚举值(逗号分隔)"
-                style="width: 150px"
-              />
-              <el-button
-                v-if="dictionaryForm.columns.length > 1"
-                type="danger"
-                :icon="Delete"
-                circle
-                @click="removeDictionaryColumn(index)"
-              />
+              <div class="column-header">
+                <span class="column-index">字段 {{ index + 1 }}</span>
+                <el-button
+                  v-if="dictionaryForm.columns.length > 1"
+                  type="danger"
+                  link
+                  size="small"
+                  @click="removeDictionaryColumn(index)"
+                >
+                  删除
+                </el-button>
+              </div>
+              <div class="column-row">
+                <div class="column-field">
+                  <label class="field-label"><span class="required">*</span> 字段Key</label>
+                  <el-input v-model="column.key" placeholder="如: id" />
+                </div>
+                <div class="column-field">
+                  <label class="field-label"><span class="required">*</span> 字段名称</label>
+                  <el-input v-model="column.label" placeholder="如: ID" />
+                </div>
+                <div class="column-field">
+                  <label class="field-label">字段类型</label>
+                  <el-select v-model="column.type" placeholder="选择类型">
+                    <el-option label="字符串" value="string" />
+                    <el-option label="数字" value="number" />
+                    <el-option label="枚举" value="enum" />
+                  </el-select>
+                </div>
+              </div>
+              <!-- 数字类型额外配置 -->
+              <div v-if="column.type === 'number'" class="column-extra">
+                <div class="column-field column-field-small">
+                  <label class="field-label">最小值</label>
+                  <el-input v-model="column.min" placeholder="可选" type="number" />
+                </div>
+                <div class="column-field column-field-small">
+                  <label class="field-label">最大值</label>
+                  <el-input v-model="column.max" placeholder="可选" type="number" />
+                </div>
+              </div>
+              <!-- 枚举类型额外配置 -->
+              <div v-if="column.type === 'enum'" class="column-extra">
+                <div class="column-field column-field-full">
+                  <label class="field-label">枚举值</label>
+                  <el-input
+                    v-model="column.enumOptions"
+                    placeholder="多个枚举值用逗号分隔，如: 选项1,选项2,选项3"
+                  />
+                </div>
+              </div>
             </div>
-            <el-button type="primary" link @click="addDictionaryColumn">
+            <el-button
+              v-if="dictionaryForm.columns.length < 10"
+              type="primary"
+              link
+              :icon="Plus"
+              @click="addDictionaryColumn"
+            >
               添加字段
             </el-button>
+            <span v-else class="field-limit-tip">最多支持10个字段</span>
           </div>
         </el-form-item>
       </el-form>
@@ -1816,31 +1903,74 @@ const handleSizeChange = (size) => {
 .columns-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .column-item {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
 }
 
-.column-main {
+.column-header {
   display: flex;
-  gap: 8px;
+  justify-content: space-between;
   align-items: center;
+  margin-bottom: 12px;
+}
+
+.column-index {
+  font-size: 13px;
+  font-weight: 500;
+  color: #606266;
+}
+
+.column-row {
+  display: flex;
+  gap: 12px;
+}
+
+.column-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.column-field-small {
+  flex: 0 0 120px;
+}
+
+.column-field-full {
+  flex: 1;
+}
+
+.field-label {
+  font-size: 12px;
+  color: #909399;
+}
+
+.field-label .required {
+  color: #f56c6c;
+  margin-right: 2px;
 }
 
 .column-extra {
   display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-top: 4px;
-  padding-left: 100px;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #dcdfe6;
 }
 
 .column-item .el-input,
 .column-item .el-select {
-  flex-shrink: 0;
+  width: 100%;
+}
+
+.field-limit-tip {
+  font-size: 13px;
+  color: #909399;
 }
 </style>
