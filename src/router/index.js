@@ -28,18 +28,6 @@ const router = createRouter({
           meta: { title: '测评集详情' },
         },
         {
-          path: 'prompt',
-          name: 'prompt',
-          component: () => import('@/views/prompt/PromptView.vue'),
-          meta: { title: 'Prompt管理' },
-        },
-        {
-          path: 'prompt/:id',
-          name: 'prompt-detail',
-          component: () => import('@/views/prompt/PromptDetailView.vue'),
-          meta: { title: 'Prompt详情' },
-        },
-        {
           path: 'environment',
           name: 'environment',
           component: () => import('@/views/environment/EnvironmentView.vue'),

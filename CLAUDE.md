@@ -58,6 +58,19 @@ src/
 
 ## 分页组件规范
 
+### 全局中文配置
+
+在 `main.js` 中已配置 Element Plus 中文语言包，确保所有组件（包括分页）显示中文：
+
+```javascript
+import ElementPlus from 'element-plus'
+import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
+
+app.use(ElementPlus, { locale: zhCn })
+```
+
+### 分页组件配置
+
 所有列表页的分页组件统一使用以下配置：
 
 ```vue
@@ -85,10 +98,19 @@ src/
 </style>
 ```
 
+### 配置说明
+
 - **默认每页条数**：10
 - **可选每页条数**：[10, 20, 50, 100]
-- **布局元素**：total（总数）、sizes（每页条数选择）、prev（上一页）、pager（页码）、next（下一页）、jumper（跳转输入框）
+- **布局元素**：
+  - `total` - 显示"共 X 条"
+  - `sizes` - 每页条数选择器（显示"X 条/页"）
+  - `prev` - 上一页按钮
+  - `pager` - 页码
+  - `next` - 下一页按钮
+  - `jumper` - 跳转输入框（显示"前往 X 页"）
 - **布局位置**：右对齐（使用 flex + justify-content: flex-end）
+- **中文显示**：通过全局中文配置自动显示中文文案
 
 ## Node 版本要求
 

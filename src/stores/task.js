@@ -66,12 +66,6 @@ export const useTaskStore = defineStore('task', () => {
       color: '#67c23a',
     },
     {
-      title: 'Prompt',
-      value: 36,
-      icon: 'Document',
-      color: '#e6a23c',
-    },
-    {
       title: '测评集',
       value: 15,
       icon: 'FolderOpened',

@@ -9,7 +9,6 @@ const getPageTitle = () => {
   const titleMap = {
     '/dashboard': '首页',
     '/dataset': '测评集管理',
-    '/prompt': 'Prompt管理',
     '/environment': '环境管理',
     '/plugin': '插件管理',
     '/execution': '测试执行',

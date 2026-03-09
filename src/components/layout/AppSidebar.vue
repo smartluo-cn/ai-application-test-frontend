@@ -18,11 +18,10 @@ const router = useRouter()
 const menuItems = [
   { index: '1', title: '首页', icon: 'HomeFilled', route: '/dashboard' },
   { index: '2', title: '测评集管理', icon: 'FolderOpened', route: '/dataset' },
-  { index: '3', title: 'Prompt管理', icon: 'Document', route: '/prompt' },
-  { index: '4', title: '环境管理', icon: 'Setting', route: '/environment' },
-  { index: '5', title: '插件管理', icon: 'Connection', route: '/plugin' },
-  { index: '6', title: '测试执行', icon: 'VideoPlay', route: '/execution' },
-  { index: '7', title: '测试报告', icon: 'DataAnalysis', route: '/result' },
+  { index: '3', title: '环境管理', icon: 'Setting', route: '/environment' },
+  { index: '4', title: '插件管理', icon: 'Connection', route: '/plugin' },
+  { index: '5', title: '测试执行', icon: 'VideoPlay', route: '/execution' },
+  { index: '6', title: '测试报告', icon: 'DataAnalysis', route: '/result' },
 ]
 
 const iconComponents = {

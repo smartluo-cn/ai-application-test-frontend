@@ -1,17 +1,15 @@
 <script setup>
-import { Plus, Upload, EditPen, Tools } from '@element-plus/icons-vue'
+import { Plus, Upload, Tools } from '@element-plus/icons-vue'
 
 const actions = [
   { label: '新建测试任务', icon: 'Plus', route: '/execution' },
   { label: '导入测评集', icon: 'Upload', route: '/dataset' },
-  { label: '创建Prompt', icon: 'EditPen', route: '/prompt' },
   { label: '配置环境', icon: 'Tools', route: '/environment' },
 ]
 
 const iconComponents = {
   Plus,
   Upload,
-  EditPen,
   Tools,
 }
 
