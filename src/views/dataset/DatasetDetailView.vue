@@ -18,6 +18,8 @@ import {
   Loading,
   Setting,
   List,
+  Collection,
+  QuestionFilled,
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as XLSX from 'xlsx'
@@ -27,6 +29,133 @@ const router = useRouter()
 
 // 测评集数据（模拟）
 const dataset = ref(null)
+
+// 数据字典列表（模拟）
+const dataDictionaries = ref([
+  {
+    id: 'dict-1',
+    name: '通用对话测试',
+    description: '用于测试模型的基础对话能力，包含多轮对话、意图识别等测试场景',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'input', label: '输入', type: 'string' },
+      { key: 'expectedOutput', label: '期望输出', type: 'string' },
+      { key: 'category', label: '分类', type: 'enum', enumOptions: ['问候', '询问', '建议', '闲聊', '投诉', '咨询'] },
+      { key: 'difficulty', label: '难度', type: 'enum', enumOptions: ['简单', '中等', '困难'] },
+    ],
+    createdAt: '2024-01-15',
+    updatedAt: '2024-02-20',
+  },
+  {
+    id: 'dict-2',
+    name: '代码生成测试',
+    description: '用于测试模型的代码生成能力',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'prompt', label: '提示词', type: 'string' },
+      { key: 'expectedCode', label: '期望代码', type: 'string' },
+    ],
+    createdAt: '2024-02-01',
+    updatedAt: '2024-02-15',
+  },
+  {
+    id: 'dict-3',
+    name: '文本摘要测试',
+    description: '用于测试模型的文本摘要能力',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'originalText', label: '原文', type: 'string' },
+      { key: 'expectedSummary', label: '期望摘要', type: 'string' },
+    ],
+    createdAt: '2024-02-25',
+    updatedAt: '2024-02-26',
+  },
+])
+
+// 获取关联的数据字典
+const getDictionary = (dictionaryId) => {
+  if (!dictionaryId) return null
+  return dataDictionaries.value.find(d => d.id === dictionaryId)
+}
+
+// 预置标签列表
+const presetTags = [
+  '对话',
+  '通用',
+  '代码',
+  '编程',
+  '文档',
+  '理解',
+  '数据',
+  '分析',
+  '数学',
+  '推理',
+  '翻译',
+  '多语言',
+  '写作',
+  '创意',
+  '知识',
+  '问答',
+  '情感',
+  'NLP',
+  '摘要',
+  '生成',
+  '检索',
+  'SQL',
+  '数据库',
+  '分类',
+  'NER',
+  '状态',
+  '纠错',
+  '阅读',
+  '补全',
+  '关键词',
+  '相似度',
+  '匹配',
+  '图像',
+  '多模态',
+  '逻辑',
+  '常识',
+  'API',
+  '工具',
+]
+
+// 测试类型选项
+const testTypeOptions = [
+  { value: 'objective', label: '客观题' },
+  { value: 'subjective', label: '主观题' },
+]
+
+// 获取测试类型文本
+const getTestTypeText = (testType) => {
+  return testType === 'subjective' ? '主观题' : '客观题'
+}
+
+// 获取测试类型标签类型
+const getTestTypeTagType = (testType) => {
+  return testType === 'subjective' ? 'warning' : ''
+}
+
+// 图标选项
+const iconOptions = [
+  { value: 'ChatDotRound', label: '对话' },
+  { value: 'Cpu', label: '代码' },
+  { value: 'Document', label: '文档' },
+  { value: 'DataAnalysis', label: '数据分析' },
+]
+
+// 图标映射
+const iconMap = {
+  ChatDotRound,
+  Cpu,
+  Document,
+  DataAnalysis,
+}
+
+// 获取图标组件
+const getIconComponent = (iconName) => {
+  return iconMap[iconName] || ChatDotRound
+}
 
 // 测试数据列表（模拟）
 const testData = ref([])
@@ -173,20 +302,7 @@ const editingCell = ref(null)
 // 编辑内容
 const editContent = ref('')
 
-// 图标映射
-const iconMap = {
-  ChatDotRound,
-  Cpu,
-  Document,
-  DataAnalysis,
-}
-
-// 获取图标组件
-const getIconComponent = (iconName) => {
-  return iconMap[iconName] || FolderOpened
-}
-
-// 列定义（响应式，支持编辑，支持枚举值）
+// 列定义（响应式，支持编辑、支持枚举值）
 const columns = ref([
   { key: 'id', label: 'ID', width: 80 },
   { key: 'input', label: '输入', width: 300 },
@@ -362,19 +478,86 @@ const saveColumnConfig = () => {
 // 加载测评集数据
 const loadDataset = () => {
   const id = route.params.id
-  // 模拟数据
+  // 模拟数据 - 与列表页保持一致
   const mockDatasets = {
     '1': {
       id: '1',
       name: '通用对话测评集',
       icon: 'ChatDotRound',
       iconType: 'preset',
+      testType: 'objective',
       tags: ['对话', '通用'],
       description:
         '包含多轮对话、常识问答等通用场景的测试数据，用于评估模型的对话能力。',
-      dataCount: 25,
+      dataCount: 256,
+      dictionaryId: 'dict-1',
       createdAt: '2024-01-15',
       updatedAt: '2024-02-20',
+    },
+    '2': {
+      id: '2',
+      name: '代码生成测评集',
+      icon: 'Cpu',
+      iconType: 'preset',
+      testType: 'objective',
+      tags: ['代码', '编程'],
+      description: '包含多种编程语言的代码生成任务，用于评估模型的代码生成能力。',
+      dataCount: 128,
+      dictionaryId: 'dict-2',
+      createdAt: '2024-02-01',
+      updatedAt: '2024-02-15',
+    },
+    '3': {
+      id: '3',
+      name: '文档摘要测评集',
+      icon: 'Document',
+      iconType: 'preset',
+      testType: 'subjective',
+      tags: ['摘要', '生成'],
+      description: '包含新闻摘要、论文摘要等任务，用于评估模型的文本摘要能力。',
+      dataCount: 156,
+      dictionaryId: 'dict-3',
+      createdAt: '2024-02-18',
+      updatedAt: '2024-02-26',
+    },
+    '4': {
+      id: '4',
+      name: '阅读理解测评集',
+      icon: 'DataAnalysis',
+      iconType: 'preset',
+      testType: 'objective',
+      tags: ['问答', '检索'],
+      description: '包含基于上下文的问答任务，用于评估模型的阅读理解和信息提取能力。',
+      dataCount: 380,
+      dictionaryId: 'dict-4',
+      createdAt: '2024-02-19',
+      updatedAt: '2024-02-26',
+    },
+    '5': {
+      id: '5',
+      name: 'SQL生成测评集',
+      icon: 'Cpu',
+      iconType: 'preset',
+      testType: 'objective',
+      tags: ['SQL', '数据库'],
+      description: '包含自然语言转SQL的任务，用于评估模型的数据库查询生成能力。',
+      dataCount: 120,
+      dictionaryId: 'dict-2',
+      createdAt: '2024-02-20',
+      updatedAt: '2024-02-26',
+    },
+    '6': {
+      id: '6',
+      name: '情感分析测评集',
+      icon: 'ChatDotRound',
+      iconType: 'preset',
+      testType: 'objective',
+      tags: ['情感', 'NLP'],
+      description: '包含文本情感分类、情绪识别等任务，用于评估模型的情感理解能力。',
+      dataCount: 200,
+      dictionaryId: 'dict-5',
+      createdAt: '2024-02-17',
+      updatedAt: '2024-02-26',
     },
   }
 
@@ -383,9 +566,11 @@ const loadDataset = () => {
     name: '示例测评集',
     icon: 'ChatDotRound',
     iconType: 'preset',
+    testType: 'objective',
     tags: ['示例', '测试'],
     description: '这是一个示例测评集的描述信息。',
     dataCount: 15,
+    dictionaryId: '',
     createdAt: '2024-01-01',
     updatedAt: '2024-02-01',
   }
@@ -434,6 +619,11 @@ const goBack = () => {
   router.push('/dataset')
 }
 
+// 跳转到数据字典详情
+const goToDictionaryDetail = (id) => {
+  router.push(`/dictionary/${id}`)
+}
+
 // 编辑测评集
 const editDialogVisible = ref(false)
 const editForm = reactive({
@@ -443,7 +633,16 @@ const editForm = reactive({
   iconType: 'preset',
   icon: 'ChatDotRound',
   customIconUrl: '',
+  testType: 'objective',
+  dictionaryId: '',
 })
+
+// 编辑表单验证规则
+const editFormRules = {
+  name: [{ required: true, message: '请输入测评集名称', trigger: 'blur' }],
+  testType: [{ required: true, message: '请选择测试类型', trigger: 'change' }],
+  dictionaryId: [{ required: true, message: '请选择数据字典', trigger: 'change' }],
+}
 
 const handleEdit = () => {
   if (!dataset.value) return
@@ -455,6 +654,8 @@ const handleEdit = () => {
   editForm.iconType = dataset.value.iconType || 'preset'
   editForm.icon = dataset.value.icon || 'ChatDotRound'
   editForm.customIconUrl = dataset.value.customIconUrl || ''
+  editForm.testType = dataset.value.testType || 'objective'
+  editForm.dictionaryId = dataset.value.dictionaryId || ''
 
   editDialogVisible.value = true
 }
@@ -472,6 +673,8 @@ const saveDatasetEdit = () => {
   dataset.value.iconType = editForm.iconType
   dataset.value.icon = editForm.icon
   dataset.value.customIconUrl = editForm.customIconUrl
+  dataset.value.testType = editForm.testType
+  dataset.value.dictionaryId = editForm.dictionaryId
   dataset.value.updatedAt = new Date().toISOString().slice(0, 10)
 
   editDialogVisible.value = false
@@ -480,6 +683,32 @@ const saveDatasetEdit = () => {
 
 const cancelDatasetEdit = () => {
   editDialogVisible.value = false
+}
+
+// 处理图片上传
+const handleImageUpload = (options) => {
+  const file = options.file
+  if (!file) return
+
+  // 检查文件大小（2MB）
+  if (file.size > 2 * 1024 * 1024) {
+    ElMessage.error('图片大小不能超过 2MB')
+    return
+  }
+
+  // 模拟上传，使用 FileReader 读取为 base64
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    editForm.customIconUrl = e.target?.result
+    ElMessage.success('图标上传成功')
+  }
+  reader.readAsDataURL(file)
+}
+
+// 删除自定义图标
+const handleRemoveCustomIcon = () => {
+  editForm.customIconUrl = ''
+  ElMessage.success('已删除自定义图标')
 }
 
 // 解析文件数据
@@ -1018,6 +1247,14 @@ onMounted(() => {
         </div>
         <div class="info-details">
           <div class="info-row">
+            <span class="info-label">测试类型：</span>
+            <div class="info-value">
+              <el-tag :type="getTestTypeTagType(dataset.testType)" size="small">
+                {{ getTestTypeText(dataset.testType) }}
+              </el-tag>
+            </div>
+          </div>
+          <div class="info-row">
             <span class="info-label">描述：</span>
             <span class="info-value">{{ dataset.description }}</span>
           </div>
@@ -1027,6 +1264,18 @@ onMounted(() => {
               <el-tag v-for="tag in dataset.tags" :key="tag" size="small" type="info">
                 {{ tag }}
               </el-tag>
+            </div>
+          </div>
+          <div class="info-row" v-if="getDictionary(dataset.dictionaryId)">
+            <span class="info-label">数据字典：</span>
+            <div class="info-value">
+              <div class="dictionary-link clickable" @click="goToDictionaryDetail(dataset.dictionaryId)">
+                <el-icon><Collection /></el-icon>
+                <span>{{ getDictionary(dataset.dictionaryId)?.name }}</span>
+                <el-tag size="small" type="info" effect="plain" style="margin-left: 8px;">
+                  {{ getDictionary(dataset.dictionaryId)?.columns?.length || 0 }} 个字段
+                </el-tag>
+              </div>
             </div>
           </div>
           <div class="info-row">
@@ -1098,7 +1347,6 @@ onMounted(() => {
       <div class="excel-wrapper" :class="{ 'edit-mode': isTableEditMode }">
         <table class="excel-table">
           <thead>
-            <!-- 第1行：列名（可编辑） -->
             <tr>
               <th class="row-header"></th>
               <th
@@ -1126,37 +1374,6 @@ onMounted(() => {
                 </template>
                 <template v-else>
                   {{ col.label }}
-                </template>
-              </th>
-            </tr>
-            <!-- 第2行：列ID（可编辑） -->
-            <tr class="column-id-row">
-              <th class="row-header"></th>
-              <th
-                v-for="(col, colIndex) in columns"
-                :key="'id-' + col.key"
-                :style="{ width: col.width + 'px' }"
-                class="column-id-cell"
-                :class="{
-                  'header-editable': isTableEditMode,
-                  'header-editing': editingHeaderCell?.type === 'key' && editingHeaderCell?.index === colIndex,
-                }"
-                @click="isTableEditMode && selectHeaderCell('key', colIndex)"
-                @dblclick="isTableEditMode && startHeaderEdit('key', colIndex)"
-              >
-                <template v-if="editingHeaderCell?.type === 'key' && editingHeaderCell?.index === colIndex">
-                  <input
-                    v-model="editHeaderContent"
-                    class="header-input"
-                    @blur="saveHeaderEdit"
-                    @keyup.enter="saveHeaderEdit"
-                    @keyup.esc="cancelHeaderEdit"
-                    ref="headerEditInput"
-                    autofocus
-                  />
-                </template>
-                <template v-else>
-                  {{ col.key }}
                 </template>
               </th>
             </tr>
@@ -1272,82 +1489,207 @@ onMounted(() => {
     <el-dialog
       v-model="editDialogVisible"
       title="编辑测评集"
-      width="550px"
+      width="720px"
       :close-on-click-modal="false"
+      class="edit-dataset-dialog"
     >
-      <el-form :model="editForm" label-width="100px">
-        <el-form-item label="名称" required>
-          <el-input v-model="editForm.name" placeholder="请输入测评集名称" maxlength="50" show-word-limit />
-        </el-form-item>
+      <el-form
+        ref="editFormRef"
+        :model="editForm"
+        :rules="editFormRules"
+        label-width="88px"
+        label-position="left"
+        class="dataset-form"
+      >
+        <!-- 基础配置 -->
+        <div class="form-section-card">
+          <div class="section-header">
+            <div class="section-icon">
+              <el-icon :size="18"><Document /></el-icon>
+            </div>
+            <div class="section-info">
+              <div class="section-title">基础配置</div>
+              <div class="section-desc">设置测评集的基本信息</div>
+            </div>
+          </div>
 
-        <el-form-item label="描述">
-          <el-input
-            v-model="editForm.description"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入测评集描述"
-            maxlength="200"
-            show-word-limit
-          />
-        </el-form-item>
+          <div class="section-content">
+            <el-form-item label="名称" prop="name">
+              <el-input
+                v-model="editForm.name"
+                placeholder="请输入测评集名称"
+                maxlength="50"
+                show-word-limit
+              />
+            </el-form-item>
 
-        <el-form-item label="标签">
-          <el-select
-            v-model="editForm.tags"
-            multiple
-            filterable
-            allow-create
-            default-first-option
-            placeholder="请选择或输入标签"
-            style="width: 100%"
-          >
-            <el-option label="对话" value="对话" />
-            <el-option label="问答" value="问答" />
-            <el-option label="代码" value="代码" />
-            <el-option label="推理" value="推理" />
-            <el-option label="翻译" value="翻译" />
-            <el-option label="写作" value="写作" />
-            <el-option label="知识" value="知识" />
-            <el-option label="多模态" value="多模态" />
-          </el-select>
-        </el-form-item>
+            <el-form-item prop="testType">
+              <template #label>
+                <span>测试类型</span>
+                <el-tooltip placement="top">
+                  <template #content>
+                    <div class="tooltip-content">
+                      <p><strong>客观题：</strong>有标准答案，可自动判定通过/失败</p>
+                      <p><strong>主观题：</strong>无标准答案，需人工评估</p>
+                    </div>
+                  </template>
+                  <el-icon class="label-tooltip-icon"><QuestionFilled /></el-icon>
+                </el-tooltip>
+              </template>
+              <el-radio-group v-model="editForm.testType" class="test-type-radio">
+                <el-radio-button
+                  v-for="option in testTypeOptions"
+                  :key="option.value"
+                  :value="option.value"
+                >
+                  {{ option.label }}
+                </el-radio-button>
+              </el-radio-group>
+            </el-form-item>
 
-        <el-form-item label="图标类型">
-          <el-radio-group v-model="editForm.iconType">
-            <el-radio-button value="preset">预设图标</el-radio-button>
-            <el-radio-button value="custom">自定义图标</el-radio-button>
-          </el-radio-group>
-        </el-form-item>
+            <el-form-item label="描述" prop="description">
+              <el-input
+                v-model="editForm.description"
+                type="textarea"
+                placeholder="请输入测评集描述，说明用途和测试场景"
+                :rows="3"
+                maxlength="200"
+                show-word-limit
+              />
+            </el-form-item>
+          </div>
+        </div>
 
-        <el-form-item v-if="editForm.iconType === 'preset'" label="选择图标">
-          <el-select v-model="editForm.icon" placeholder="请选择图标" style="width: 100%">
-            <el-option label="对话" value="ChatDotRound">
-              <el-icon><ChatDotRound /></el-icon>
-              <span style="margin-left: 8px">对话</span>
-            </el-option>
-            <el-option label="文档" value="Document">
-              <el-icon><Document /></el-icon>
-              <span style="margin-left: 8px">文档</span>
-            </el-option>
-            <el-option label="代码" value="Cpu">
-              <el-icon><Cpu /></el-icon>
-              <span style="margin-left: 8px">代码</span>
-            </el-option>
-            <el-option label="数据分析" value="DataAnalysis">
-              <el-icon><DataAnalysis /></el-icon>
-              <span style="margin-left: 8px">数据分析</span>
-            </el-option>
-          </el-select>
-        </el-form-item>
+        <!-- 标签与字典 -->
+        <div class="form-section-card">
+          <div class="section-header">
+            <div class="section-icon" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+              <el-icon :size="18"><Collection /></el-icon>
+            </div>
+            <div class="section-info">
+              <div class="section-title">标签与字典</div>
+              <div class="section-desc">关联数据结构和分类标签</div>
+            </div>
+          </div>
 
-        <el-form-item v-if="editForm.iconType === 'custom'" label="图标URL">
-          <el-input v-model="editForm.customIconUrl" placeholder="请输入图标图片URL" />
-        </el-form-item>
+          <div class="section-content">
+            <el-form-item label="标签" prop="tags">
+              <el-select
+                v-model="editForm.tags"
+                multiple
+                collapse-tags
+                collapse-tags-tooltip
+                placeholder="选择标签便于分类和检索"
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="tag in presetTags"
+                  :key="tag"
+                  :label="tag"
+                  :value="tag"
+                />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item prop="dictionaryId">
+              <template #label>
+                <span>数据字典</span>
+                <el-tooltip content="选择数据字典后，将自动继承其字段结构" placement="top">
+                  <el-icon class="label-tooltip-icon"><QuestionFilled /></el-icon>
+                </el-tooltip>
+              </template>
+              <el-select
+                v-model="editForm.dictionaryId"
+                placeholder="选择关联的数据字典"
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="dict in dataDictionaries"
+                  :key="dict.id"
+                  :label="dict.name"
+                  :value="dict.id"
+                />
+              </el-select>
+            </el-form-item>
+          </div>
+        </div>
+
+        <!-- 图标设置 -->
+        <div class="form-section-card">
+          <div class="section-header">
+            <div class="section-icon" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
+              <el-icon :size="18"><DataAnalysis /></el-icon>
+            </div>
+            <div class="section-info">
+              <div class="section-title">图标设置</div>
+              <div class="section-desc">选择或上传测评集图标</div>
+            </div>
+          </div>
+
+          <div class="section-content">
+            <el-form-item label="图标类型" prop="icon">
+              <div class="icon-selector">
+                <el-radio-group v-model="editForm.iconType" class="icon-type-group">
+                  <el-radio-button value="preset">预设图标</el-radio-button>
+                  <el-radio-button value="custom">自定义上传</el-radio-button>
+                </el-radio-group>
+
+                <!-- 预设图标选择 -->
+                <div v-if="editForm.iconType === 'preset'" class="preset-icons-grid">
+                  <div
+                    v-for="option in iconOptions"
+                    :key="option.value"
+                    class="icon-card"
+                    :class="{ active: editForm.icon === option.value }"
+                    @click="editForm.icon = option.value"
+                  >
+                    <div class="icon-preview">
+                      <el-icon :size="28">
+                        <component :is="iconMap[option.value]" />
+                      </el-icon>
+                    </div>
+                    <span class="icon-label">{{ option.label }}</span>
+                  </div>
+                </div>
+
+                <!-- 自定义图标上传 -->
+                <div v-else class="custom-icon-upload">
+                  <el-upload
+                    v-if="!editForm.customIconUrl"
+                    class="icon-uploader"
+                    :show-file-list="false"
+                    :http-request="handleImageUpload"
+                    accept="image/*"
+                    drag
+                  >
+                    <div class="upload-content">
+                      <el-icon class="upload-icon" :size="32"><Plus /></el-icon>
+                      <div class="upload-text">
+                        <span>点击或拖拽上传</span>
+                        <span class="upload-hint">支持 JPG、PNG 格式，不超过 2MB</span>
+                      </div>
+                    </div>
+                  </el-upload>
+                  <div v-else class="custom-icon-preview">
+                    <img :src="editForm.customIconUrl" alt="自定义图标" />
+                    <div class="preview-overlay">
+                      <el-button type="danger" size="small" circle @click="handleRemoveCustomIcon">
+                        <el-icon><Delete /></el-icon>
+                      </el-button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </el-form-item>
+          </div>
+        </div>
       </el-form>
 
       <template #footer>
-        <el-button @click="cancelDatasetEdit">取消</el-button>
-        <el-button type="primary" @click="saveDatasetEdit">保存</el-button>
+        <div class="dialog-footer">
+          <el-button @click="cancelDatasetEdit">取消</el-button>
+          <el-button type="primary" @click="saveDatasetEdit">保存修改</el-button>
+        </div>
       </template>
     </el-dialog>
 
@@ -1913,5 +2255,350 @@ onMounted(() => {
 
 .enum-option-add .el-button {
   flex-shrink: 0;
+}
+
+/* 数据字典链接样式 */
+.dictionary-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #667eea;
+  font-size: 14px;
+}
+
+.dictionary-link.clickable {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 4px 8px;
+  margin: -4px -8px;
+  border-radius: 6px;
+}
+
+.dictionary-link.clickable:hover {
+  background: rgba(102, 126, 234, 0.1);
+  color: #5a67d8;
+}
+
+.dictionary-link .el-icon {
+  font-size: 16px;
+}
+
+/* 编辑测评集对话框样式 */
+.edit-dataset-dialog :deep(.el-dialog__header) {
+  padding: 20px 24px;
+  border-bottom: 1px solid #f0f0f0;
+  margin-right: 0;
+}
+
+.edit-dataset-dialog :deep(.el-dialog__title) {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.edit-dataset-dialog :deep(.el-dialog__body) {
+  padding: 24px;
+  max-height: 65vh;
+  overflow-y: auto;
+}
+
+.edit-dataset-dialog :deep(.el-dialog__footer) {
+  padding: 16px 24px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.dataset-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 表单分区卡片 */
+.form-section-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease;
+}
+
+.form-section-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: linear-gradient(to right, #f9fafb, #ffffff);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.section-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border-radius: 10px;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.section-info {
+  flex: 1;
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+  line-height: 1.4;
+}
+
+.section-desc {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+
+.section-content {
+  padding: 20px;
+}
+
+.section-content :deep(.el-form-item) {
+  display: flex;
+  flex-wrap: nowrap;
+  margin-bottom: 20px;
+}
+
+.section-content :deep(.el-form-item:last-child) {
+  margin-bottom: 0;
+}
+
+.section-content :deep(.el-form-item__label) {
+  font-weight: 500;
+  color: #374151;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.section-content :deep(.el-form-item__content) {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 测试类型单选按钮 */
+.test-type-radio {
+  width: 100%;
+  display: flex;
+}
+
+.test-type-radio :deep(.el-radio-button) {
+  flex: 1;
+}
+
+.test-type-radio :deep(.el-radio-button__inner) {
+  width: 100%;
+}
+
+/* 图标选择器 */
+.icon-selector {
+  width: 100%;
+}
+
+.icon-type-group {
+  margin-bottom: 16px;
+}
+
+/* 预设图标网格 */
+.preset-icons-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.icon-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 12px;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #fafafa;
+}
+
+.icon-card:hover {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.icon-card.active {
+  border-color: #3b82f6;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.icon-preview {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border-radius: 12px;
+  color: #fff;
+}
+
+.icon-card.active .icon-preview {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  transform: scale(1.05);
+}
+
+.icon-label {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.icon-card.active .icon-label {
+  color: #3b82f6;
+}
+
+/* 自定义图标上传 */
+.custom-icon-upload {
+  margin-top: 12px;
+}
+
+.icon-uploader {
+  width: 100%;
+}
+
+.icon-uploader :deep(.el-upload-dragger) {
+  width: 100%;
+  height: auto;
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  background: #fafafa;
+  padding: 24px;
+  transition: all 0.2s ease;
+}
+
+.icon-uploader :deep(.el-upload-dragger:hover) {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.upload-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.upload-icon {
+  color: #9ca3af;
+}
+
+.icon-uploader :deep(.el-upload-dragger:hover) .upload-icon {
+  color: #3b82f6;
+}
+
+.upload-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.upload-text span {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.upload-hint {
+  font-size: 12px !important;
+  color: #9ca3af !important;
+}
+
+/* 自定义图标预览 */
+.custom-icon-preview {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 2px solid #e5e7eb;
+  margin: 0 auto;
+}
+
+.custom-icon-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.preview-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.custom-icon-preview:hover .preview-overlay {
+  opacity: 1;
+}
+
+/* 对话框底部 */
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.dialog-footer .el-button {
+  min-width: 100px;
+}
+
+/* 标签提示图标 */
+.label-tooltip-icon {
+  margin-left: 4px;
+  color: #9ca3af;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: color 0.2s;
+}
+
+.label-tooltip-icon:hover {
+  color: #3b82f6;
+}
+
+/* 提示框内容 */
+.tooltip-content p {
+  margin: 0 0 6px 0;
+  line-height: 1.5;
+}
+
+.tooltip-content p:last-child {
+  margin-bottom: 0;
+}
+
+.tooltip-content strong {
+  color: #3b82f6;
 }
 </style>

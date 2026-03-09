@@ -584,6 +584,11 @@ const handleViewDetail = (id) => {
   router.push(`/dataset/${id}`)
 }
 
+// 跳转到数据字典详情
+const goToDictionaryDetail = (id) => {
+  router.push(`/dictionary/${id}`)
+}
+
 // 删除测评集
 const handleDelete = (dataset) => {
   ElMessageBox.confirm(`确定要删除测评集「${dataset.name}」吗？删除后无法恢复。`, '删除确认', {
@@ -1226,7 +1231,7 @@ const handleDictSizeChange = (size) => {
               <el-icon><FolderOpened /></el-icon>
               <span class="data-count">{{ dataset.dataCount }} 条测试数据</span>
             </div>
-            <div v-if="dataset.dictionaryId" class="dictionary-info">
+            <div v-if="dataset.dictionaryId" class="dictionary-info clickable" @click.stop="goToDictionaryDetail(dataset.dictionaryId)">
               <el-icon><Collection /></el-icon>
               <span class="dictionary-name">{{ getDictionaryName(dataset.dictionaryId) }}</span>
             </div>
@@ -1302,7 +1307,7 @@ const handleDictSizeChange = (size) => {
                 <el-button class="more-btn" :icon="More" circle size="small" />
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item @click="openViewDictionaryDialog(dict)">
+                    <el-dropdown-item @click="goToDictionaryDetail(dict.id)">
                       查看详情
                     </el-dropdown-item>
                     <el-dropdown-item @click="openEditDictionaryDialog(dict)">
@@ -1347,7 +1352,7 @@ const handleDictSizeChange = (size) => {
                 </div>
               </div>
               <div class="card-actions">
-                <el-button text type="primary" size="small" @click="openViewDictionaryDialog(dict)"
+                <el-button text type="primary" size="small" @click="goToDictionaryDetail(dict.id)"
                   >查看</el-button
                 >
                 <el-button text type="primary" size="small" @click="openEditDictionaryDialog(dict)"
@@ -2641,6 +2646,19 @@ const handleDictSizeChange = (size) => {
   gap: 4px;
   color: #909399;
   font-size: 12px;
+}
+
+.dictionary-info.clickable {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dictionary-info.clickable:hover {
+  color: #409eff;
+}
+
+.dictionary-info.clickable:hover .dictionary-name {
+  text-decoration: underline;
 }
 
 .dictionary-info .el-icon {

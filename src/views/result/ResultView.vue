@@ -625,7 +625,7 @@ const handleSearch = () => {
                   <div class="bar-value">{{ currentReport.scoreDistribution.medium }}</div>
                 </div>
                 <div class="bar-item">
-                  <div class="bar-label">较差 (<60)</div>
+                  <div class="bar-label">较差 (&lt;60)</div>
                   <div class="bar-wrapper">
                     <div class="bar poor" :style="{ width: (currentReport.scoreDistribution.poor / currentReport.totalCases * 100) + '%' }"></div>
                   </div>

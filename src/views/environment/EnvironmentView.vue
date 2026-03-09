@@ -17,7 +17,55 @@ import {
   Document,
   ArrowUp,
   ArrowDown,
+  Collection,
+  ArrowRight,
 } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
+// 数据字典列表（模拟数据，实际应该从共享状态或API获取）
+const dataDictionaries = ref([
+  {
+    id: 'dict-1',
+    name: '通用对话测试',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'input', label: '输入', type: 'string' },
+      { key: 'expectedOutput', label: '期望输出', type: 'string' },
+    ],
+  },
+  {
+    id: 'dict-2',
+    name: '代码生成测试',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'prompt', label: '提示词', type: 'string' },
+      { key: 'expectedCode', label: '期望代码', type: 'string' },
+    ],
+  },
+  {
+    id: 'dict-3',
+    name: '文本摘要测试',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'originalText', label: '原文', type: 'string' },
+      { key: 'expectedSummary', label: '期望摘要', type: 'string' },
+    ],
+  },
+])
+
+// 根据字典ID获取字典名称
+const getDictionaryName = (dictionaryId) => {
+  if (!dictionaryId) return ''
+  const dict = dataDictionaries.value.find(d => d.id === dictionaryId)
+  return dict ? dict.name : ''
+}
+
+// 跳转到数据字典详情
+const goToDictionaryDetail = (id) => {
+  router.push(`/dictionary/${id}`)
+}
 
 // 对话框控制
 const dialogVisible = ref(false)
@@ -42,6 +90,7 @@ const formData = reactive({
     password: '',
   },
   headers: [],
+  dictionaryId: '', // 关联的数据字典ID
   status: 'active',
 })
 
@@ -75,8 +124,18 @@ const apiFormData = reactive({
   bodyTemplate: '{\n  "input": "{{input}}"\n}',
   // 响应映射（变量提取）
   responseMappings: [],
+  // 执行次数配置
+  executionMode: 'single', // single: 单次, withDataset: 随数据集, custom: 自定义
+  executionCount: 1,
   status: 'active',
 })
+
+// 执行次数选项
+const executionModeOptions = [
+  { value: 'single', label: '单次' },
+  { value: 'withDataset', label: '随数据集' },
+  { value: 'custom', label: '自定义' },
+]
 
 // HTTP 方法选项
 const httpMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
@@ -101,6 +160,7 @@ const addResponseMapping = () => {
     source: 'body',
     varName: '',
     jsonPath: '',
+    appendToDataset: false,
   })
 }
 
@@ -126,6 +186,7 @@ const environments = ref([
       { key: 'Content-Type', value: 'application/json' },
       { key: 'X-App-Id', value: 'cs-app-001' },
     ],
+    dictionaryId: 'dict-1',
     apis: [
       {
         id: 'api-1',
@@ -244,6 +305,34 @@ const environments = ref([
         status: 'active',
       },
     ],
+    plugins: [
+      {
+        id: 'plugin-1',
+        name: '响应延迟采集',
+        type: 'metric',
+        description: '采集接口响应延迟数据',
+        config: {
+          metricType: 'latency',
+          unit: 'ms',
+          aggregation: 'avg',
+        },
+        order: 1,
+        status: 'active',
+      },
+      {
+        id: 'plugin-2',
+        name: 'Token 用量统计',
+        type: 'metric',
+        description: '统计 Token 使用量',
+        config: {
+          metricType: 'tokens',
+          unit: 'tokens',
+          aggregation: 'sum',
+        },
+        order: 2,
+        status: 'active',
+      },
+    ],
     status: 'active',
     lastTestTime: '2024-02-26 15:30',
     testResult: 'success',
@@ -264,6 +353,7 @@ const environments = ref([
     headers: [
       { key: 'Content-Type', value: 'application/json' },
     ],
+    dictionaryId: 'dict-2',
     apis: [
       {
         id: 'api-4',
@@ -334,6 +424,21 @@ const environments = ref([
         status: 'active',
       },
     ],
+    plugins: [
+      {
+        id: 'plugin-3',
+        name: '调用成本统计',
+        type: 'metric',
+        description: '统计 API 调用成本',
+        config: {
+          metricType: 'cost',
+          unit: 'USD',
+          aggregation: 'sum',
+        },
+        order: 1,
+        status: 'active',
+      },
+    ],
     status: 'active',
     lastTestTime: '2024-02-26 14:20',
     testResult: 'success',
@@ -354,6 +459,7 @@ const environments = ref([
       { key: 'Content-Type', value: 'application/json' },
       { key: 'X-Version', value: '2.0' },
     ],
+    dictionaryId: 'dict-3',
     apis: [
       {
         id: 'api-6',
@@ -408,6 +514,7 @@ const environments = ref([
       },
     ],
     uiSteps: [],
+    plugins: [],
     status: 'inactive',
     lastTestTime: '2024-02-25 10:00',
     testResult: 'failed',
@@ -817,6 +924,7 @@ const openEditDialog = (env) => {
   formData.authType = env.authType
   formData.authConfig = { ...env.authConfig }
   formData.headers = env.headers ? env.headers.map(h => ({ ...h })) : []
+  formData.dictionaryId = env.dictionaryId || ''
   formData.status = env.status
   dialogVisible.value = true
 }
@@ -835,6 +943,7 @@ const resetForm = () => {
     password: '',
   }
   formData.headers = []
+  formData.dictionaryId = ''
   formData.status = 'active'
   formRef.value?.resetFields()
 }
@@ -856,6 +965,7 @@ const handleSubmit = async () => {
             authType: formData.authType,
             authConfig: { ...formData.authConfig },
             headers: [...formData.headers],
+            dictionaryId: formData.dictionaryId,
             status: formData.status,
             updatedAt: new Date().toISOString().slice(0, 10),
           }
@@ -870,6 +980,7 @@ const handleSubmit = async () => {
           authType: formData.authType,
           authConfig: { ...formData.authConfig },
           headers: [...formData.headers],
+          dictionaryId: formData.dictionaryId,
           apis: [],
           status: formData.status,
           testResult: 'pending',
@@ -973,7 +1084,9 @@ const openEditApiDialog = (api) => {
   apiFormData.queryParams = api.queryParams ? api.queryParams.map(q => ({ ...q })) : []
   apiFormData.bodyType = api.bodyType || 'json'
   apiFormData.bodyTemplate = api.bodyTemplate || '{\n  "input": "{{input}}"\n}'
-  apiFormData.responseMappings = api.responseMappings ? api.responseMappings.map(m => ({ ...m })) : []
+  apiFormData.responseMappings = api.responseMappings ? api.responseMappings.map(m => ({ ...m, appendToDataset: m.appendToDataset || false })) : []
+  apiFormData.executionMode = api.executionMode || 'single'
+  apiFormData.executionCount = api.executionCount || 1
   apiFormData.status = api.status || 'active'
   apiDialogVisible.value = true
 }
@@ -990,6 +1103,8 @@ const resetApiForm = () => {
   apiFormData.bodyType = 'json'
   apiFormData.bodyTemplate = '{\n  "input": "{{input}}"\n}'
   apiFormData.responseMappings = []
+  apiFormData.executionMode = 'single'
+  apiFormData.executionCount = 1
   apiFormData.status = 'active'
   apiFormRef.value?.resetFields()
 }
@@ -1004,6 +1119,12 @@ const handleApiSubmit = async () => {
       const emptyParam = apiFormData.queryParams.find(p => !p.key || !p.key.trim())
       if (emptyParam) {
         ElMessage.warning('Params 参数名不能为空')
+        return
+      }
+
+      // 验证自定义执行次数
+      if (apiFormData.executionMode === 'custom' && (!apiFormData.executionCount || apiFormData.executionCount < 1)) {
+        ElMessage.warning('请输入有效的执行次数')
         return
       }
 
@@ -1024,6 +1145,8 @@ const handleApiSubmit = async () => {
             bodyType: apiFormData.bodyType,
             bodyTemplate: apiFormData.bodyTemplate,
             responseMappings: [...apiFormData.responseMappings],
+            executionMode: apiFormData.executionMode,
+            executionCount: apiFormData.executionCount,
             status: apiFormData.status,
           }
           ElMessage.success('接口更新成功')
@@ -1041,6 +1164,8 @@ const handleApiSubmit = async () => {
           bodyType: apiFormData.bodyType,
           bodyTemplate: apiFormData.bodyTemplate,
           responseMappings: [...apiFormData.responseMappings],
+          executionMode: apiFormData.executionMode,
+          executionCount: apiFormData.executionCount,
           order: apis.length + 1,
           status: apiFormData.status,
         }
@@ -1148,6 +1273,10 @@ const toggleApiStatus = (api) => {
                   {{ env.apis?.length || 0 }} 个接口
                 </span>
                 <span class="meta-item">{{ getAuthTypeLabel(env.authType) }}</span>
+              </div>
+              <div class="dictionary-info" v-if="env.dictionaryId">
+                <el-icon><Collection /></el-icon>
+                <span class="dictionary-name" @click.stop="goToDictionaryDetail(env.dictionaryId)">{{ getDictionaryName(env.dictionaryId) }}</span>
               </div>
             </div>
             <el-dropdown trigger="click" class="card-dropdown" @click.stop>
@@ -1260,6 +1389,20 @@ const toggleApiStatus = (api) => {
           show-icon
           style="margin-bottom: 20px"
         />
+
+        <!-- 关联的数据字典 -->
+        <el-card class="dictionary-card" v-if="currentEnvironment.dictionaryId" shadow="never">
+          <div class="dictionary-content">
+            <div class="dictionary-header">
+              <el-icon class="dictionary-icon"><Collection /></el-icon>
+              <span class="dictionary-label">关联的数据字典</span>
+            </div>
+            <div class="dictionary-info" @click="goToDictionaryDetail(currentEnvironment.dictionaryId)">
+              <span class="dictionary-name">{{ getDictionaryName(currentEnvironment.dictionaryId) }}</span>
+              <el-icon class="dictionary-arrow"><ArrowRight /></el-icon>
+            </div>
+          </div>
+        </el-card>
 
         <!-- Tab 切换 -->
         <el-tabs v-model="detailActiveTab" class="detail-tabs">
@@ -1416,6 +1559,17 @@ const toggleApiStatus = (api) => {
             maxlength="200"
             show-word-limit
           />
+        </el-form-item>
+
+        <el-form-item label="数据字典">
+          <el-select v-model="formData.dictionaryId" placeholder="选择关联的数据字典" clearable style="width: 100%">
+            <el-option
+              v-for="dict in dataDictionaries"
+              :key="dict.id"
+              :label="dict.name"
+              :value="dict.id"
+            />
+          </el-select>
         </el-form-item>
 
         <el-form-item label="Base URL" prop="baseUrl">
@@ -1612,18 +1766,46 @@ const toggleApiStatus = (api) => {
 
         <el-form-item label="">
           <div class="response-mappings-config">
+            <div class="mapping-header">
+              <span style="width: 90px">来源</span>
+              <span style="width: 120px">变量名</span>
+              <span style="flex: 1">JsonPath 表达式</span>
+              <span style="width: 100px; text-align: center">追加到数据集</span>
+              <span style="width: 32px"></span>
+            </div>
             <div v-for="(mapping, index) in apiFormData.responseMappings" :key="index" class="mapping-row">
               <el-select v-model="mapping.source" style="width: 90px">
                 <el-option v-for="s in mappingSources" :key="s.value" :label="s.label" :value="s.value" />
               </el-select>
               <el-input v-model="mapping.varName" placeholder="变量名" style="width: 120px" />
-              <el-input v-model="mapping.jsonPath" placeholder="JsonPath 表达式，如 $.data.result" style="flex: 1" />
+              <el-input v-model="mapping.jsonPath" placeholder="如 $.data.result" style="flex: 1" />
+              <el-checkbox v-model="mapping.appendToDataset" style="width: 100px; justify-content: center" />
               <el-button :icon="Delete" circle @click="removeResponseMapping(index)" />
             </div>
             <el-button type="primary" link @click="addResponseMapping">
               <el-icon><Plus /></el-icon>
               添加映射
             </el-button>
+          </div>
+        </el-form-item>
+
+        <el-divider content-position="left">
+          <span>执行配置</span>
+        </el-divider>
+
+        <el-form-item label="执行次数">
+          <div class="execution-config">
+            <el-select v-model="apiFormData.executionMode" style="width: 140px">
+              <el-option v-for="opt in executionModeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+            </el-select>
+            <el-input-number
+              v-if="apiFormData.executionMode === 'custom'"
+              v-model="apiFormData.executionCount"
+              :min="1"
+              :max="1000"
+              style="width: 120px; margin-left: 12px"
+            />
+            <span v-if="apiFormData.executionMode === 'custom'" class="execution-unit">次</span>
           </div>
         </el-form-item>
       </el-form>
@@ -1916,6 +2098,103 @@ const toggleApiStatus = (api) => {
   flex-wrap: wrap;
 }
 
+/* 数据字典链接样式（卡片中） */
+.dictionary-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dictionary-info:hover {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+}
+
+.dictionary-info .dictionary-name {
+  font-size: 12px;
+  color: #667eea;
+  font-weight: 500;
+}
+
+.dictionary-info:hover .dictionary-name {
+  color: #5a67d8;
+  text-decoration: underline;
+}
+
+/* 数据字典卡片样式（详情页） */
+.dictionary-card {
+  margin-bottom: 20px;
+  border: 1px solid #e8e8e8;
+}
+
+.dictionary-card :deep(.el-card__body) {
+  padding: 0;
+}
+
+.dictionary-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+}
+
+.dictionary-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dictionary-icon {
+  font-size: 18px;
+  color: #667eea;
+}
+
+.dictionary-label {
+  font-size: 14px;
+  color: #606266;
+}
+
+.dictionary-card .dictionary-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  margin-top: 0;
+  background: #f5f7fa;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dictionary-card .dictionary-info:hover {
+  background: #e8f4ff;
+}
+
+.dictionary-card .dictionary-info .dictionary-name {
+  font-size: 14px;
+  color: #409eff;
+  font-weight: 500;
+}
+
+.dictionary-card .dictionary-info:hover .dictionary-name {
+  color: #337ecc;
+}
+
+.dictionary-card .dictionary-arrow {
+  font-size: 14px;
+  color: #409eff;
+  transition: transform 0.2s ease;
+}
+
+.dictionary-card .dictionary-info:hover .dictionary-arrow {
+  transform: translateX(4px);
+}
+
 .api-node {
   display: flex;
   align-items: center;
@@ -2128,11 +2407,34 @@ const toggleApiStatus = (api) => {
   width: 100%;
 }
 
+.mapping-header {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #ebeef5;
+  font-size: 12px;
+  color: #909399;
+  font-weight: 500;
+}
+
 .mapping-row {
   display: flex;
   gap: 8px;
   margin-bottom: 8px;
   align-items: center;
+}
+
+/* 执行配置样式 */
+.execution-config {
+  display: flex;
+  align-items: center;
+}
+
+.execution-unit {
+  margin-left: 8px;
+  color: #606266;
+  font-size: 14px;
 }
 
 /* 变量帮助提示 */
@@ -2247,6 +2549,83 @@ const toggleApiStatus = (api) => {
 }
 
 .ui-step-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* 插件列表样式 */
+.plugin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.plugin-card {
+  border-radius: 8px;
+}
+
+.plugin-card-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.plugin-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.plugin-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.plugin-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.plugin-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.plugin-desc {
+  font-size: 13px;
+  color: #909399;
+  margin-bottom: 8px;
+}
+
+.plugin-config {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 12px;
+  color: #606266;
+}
+
+.plugin-config .config-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.plugin-config .config-label {
+  color: #909399;
+}
+
+.plugin-actions {
   display: flex;
   align-items: center;
   gap: 8px;

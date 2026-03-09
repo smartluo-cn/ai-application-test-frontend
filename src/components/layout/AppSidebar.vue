@@ -8,9 +8,11 @@ import {
   VideoPlay,
   DataAnalysis,
   Monitor,
+  ChatDotRound,
 } from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import AiChat from '@/components/chat/AiChat.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -48,7 +50,8 @@ const getIcon = (iconName) => iconComponents[iconName]
 const getIconColor = (iconName) => iconColors[iconName]
 
 const activeIndex = computed(() => {
-  const item = menuItems.find((m) => m.route === route.path)
+  // 使用路径前缀匹配，让详情页也能高亮对应的菜单项
+  const item = menuItems.find((m) => route.path === m.route || route.path.startsWith(m.route + '/'))
   return item ? item.index : '1'
 })
 
@@ -57,6 +60,13 @@ const handleSelect = (index) => {
   if (item) {
     router.push(item.route)
   }
+}
+
+// AI聊天框状态
+const chatVisible = ref(false)
+
+const openChat = () => {
+  chatVisible.value = true
 }
 </script>
 
@@ -89,16 +99,20 @@ const handleSelect = (index) => {
     </nav>
 
     <div class="sidebar-footer">
-      <div class="user-card">
-        <div class="user-avatar">
-          <span>AI</span>
+      <div class="ai-assistant-btn" @click="openChat">
+        <div class="ai-icon">
+          <el-icon :size="20"><ChatDotRound /></el-icon>
         </div>
-        <div class="user-info">
-          <span class="user-name">管理员</span>
-          <span class="user-role">系统管理</span>
+        <div class="ai-info">
+          <span class="ai-title">AI助手</span>
+          <span class="ai-desc">随时为您解答</span>
         </div>
+        <div class="ai-badge"></div>
       </div>
     </div>
+
+    <!-- AI聊天框 -->
+    <AiChat v-model:visible="chatVisible" />
   </aside>
 </template>
 
@@ -236,22 +250,31 @@ const handleSelect = (index) => {
   border-top: 1px solid #f0f0f0;
 }
 
-.user-card {
+.ai-assistant-btn {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px;
-  border-radius: 10px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+  border: 1px solid #c7d2fe;
+  cursor: pointer;
   transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
 }
 
-.user-card:hover {
-  background: #f3f4f6;
+.ai-assistant-btn:hover {
+  background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
 }
 
-.user-avatar {
+.ai-assistant-btn:active {
+  transform: translateY(0);
+}
+
+.ai-icon {
   width: 40px;
   height: 40px;
   border-radius: 10px;
@@ -260,25 +283,46 @@ const handleSelect = (index) => {
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-weight: 600;
-  font-size: 14px;
+  flex-shrink: 0;
 }
 
-.user-info {
+.ai-info {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1;
 }
 
-.user-name {
+.ai-title {
   font-size: 14px;
-  font-weight: 500;
-  color: #1f2937;
+  font-weight: 600;
+  color: #4f46e5;
 }
 
-.user-role {
+.ai-desc {
   font-size: 12px;
-  color: #9ca3af;
+  color: #6b7280;
+}
+
+.ai-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* 自定义滚动条 */

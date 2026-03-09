@@ -28,6 +28,12 @@ const router = createRouter({
           meta: { title: '测评集详情' },
         },
         {
+          path: 'dictionary/:id',
+          name: 'dictionary-detail',
+          component: () => import('@/views/dataset/DictionaryDetailView.vue'),
+          meta: { title: '数据字典详情' },
+        },
+        {
           path: 'environment',
           name: 'environment',
           component: () => import('@/views/environment/EnvironmentView.vue'),
