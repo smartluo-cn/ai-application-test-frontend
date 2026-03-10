@@ -263,31 +263,7 @@ const formData = reactive({
   description: '',
   category: 'data',
   tags: [],
-  code: `import argparse
-import json
-
-
-def execute(input_data, config):
-    """
-    插件描述
-    :param input_data: 输入测评集
-    :param config: 配置参数
-    :return: 处理结果
-    """
-    result = input_data
-    return result
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='插件执行脚本')
-    parser.add_argument('-i', '--input', type=str, default='', help='输入数据')
-    parser.add_argument('-c', '--config', type=str, default='{}', help='配置参数(JSON格式)')
-    args = parser.parse_args()
-
-    input_data = args.input
-    config = json.loads(args.config)
-    result = execute(input_data, config)
-    print(f"执行结果: {result}")`,
+  code: defaultCodeTemplate,
   params: [],
   status: 'active',
 })
@@ -340,7 +316,70 @@ const pluginCategories = [
   { value: 'data', label: '数据处理', color: 'primary' },
   { value: 'execution', label: '测试执行', color: 'success' },
   { value: 'evaluation', label: '结果评估', color: 'warning' },
+  { value: 'metrics', label: '指标采集', color: 'danger' },
 ]
+
+// 默认代码模板
+const defaultCodeTemplate = `import argparse
+import json
+
+
+def execute(input_data, config):
+    """
+    插件描述
+    :param input_data: 输入测评集
+    :param config: 配置参数
+    :return: 处理结果
+    """
+    result = input_data
+    return result
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='插件执行脚本')
+    parser.add_argument('-i', '--input', type=str, default='', help='输入数据')
+    parser.add_argument('-c', '--config', type=str, default='{}', help='配置参数(JSON格式)')
+    args = parser.parse_args()
+
+    input_data = args.input
+    config = json.loads(args.config)
+    result = execute(input_data, config)
+    print(f"执行结果: {result}")`
+
+// 指标采集类型代码模板
+const metricsCodeTemplate = `import argparse
+import json
+
+
+def execute(input_data, config):
+    """
+    指标采集插件
+    :param input_data: 打点数据，目前已支持的打点数据："input_data.requestTime":"请求发送时间","input_data.code":"响应状态码","input_data.firstResponseTime":"首次响应时间","input_data.lastResponseTime":"响应结束时间","input_data.tokens":"响应token总数"
+    :param config: 配置参数
+    :return: 处理结果
+    """
+    result = input_data
+    return result
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='插件执行脚本')
+    parser.add_argument('-i', '--input', type=str, default='', help='输入数据')
+    parser.add_argument('-c', '--config', type=str, default='{}', help='配置参数(JSON格式)')
+    args = parser.parse_args()
+
+    input_data = args.input
+    config = json.loads(args.config)
+    result = execute(input_data, config)
+    print(f"执行结果: {result}")`
+
+// 根据分类获取代码模板
+const getCodeTemplateByCategory = (category) => {
+  if (category === 'metrics') {
+    return metricsCodeTemplate
+  }
+  return defaultCodeTemplate
+}
 
 // 预设标签选项
 const presetTags = [
@@ -434,31 +473,7 @@ const resetForm = () => {
   formData.description = ''
   formData.category = 'data'
   formData.tags = []
-  formData.code = `import argparse
-import json
-
-
-def execute(input_data, config):
-    """
-    插件描述
-    :param input_data: 输入测评集
-    :param config: 配置参数
-    :return: 处理结果
-    """
-    result = input_data
-    return result
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='插件执行脚本')
-    parser.add_argument('-i', '--input', type=str, default='', help='输入数据')
-    parser.add_argument('-c', '--config', type=str, default='{}', help='配置参数(JSON格式)')
-    args = parser.parse_args()
-
-    input_data = args.input
-    config = json.loads(args.config)
-    result = execute(input_data, config)
-    print(f"执行结果: {result}")`
+  formData.code = defaultCodeTemplate
   formData.params = []
   formData.status = 'active'
   formRef.value?.resetFields()
@@ -720,6 +735,18 @@ watch(isFullscreen, (val) => {
 watch(dialogVisible, (val) => {
   if (!val && isFullscreen.value) {
     isFullscreen.value = false
+  }
+})
+
+// 监听分类变化，自动切换代码模板（仅在新建模式下）
+watch(() => formData.category, (newCategory) => {
+  // 仅在新建模式下且代码为默认模板时才自动切换
+  if (!isEditMode.value) {
+    const newTemplate = getCodeTemplateByCategory(newCategory)
+    // 检查当前代码是否为某个默认模板，如果是则切换
+    if (formData.code === defaultCodeTemplate || formData.code === metricsCodeTemplate) {
+      formData.code = newTemplate
+    }
   }
 })
 

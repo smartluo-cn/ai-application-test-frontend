@@ -205,6 +205,7 @@ const cancelEdit = () => {
 const generateDialogVisible = ref(false)
 const generateForm = reactive({
   count: 10,
+  constraints: {}, // 每列的约束信息，key 为列 key，value 为约束描述
 })
 
 // 生成进度
@@ -219,7 +220,7 @@ const showGenerateDialog = () => {
 
 // 生成随机数据（带进度模拟）
 const generateRandomData = async () => {
-  const { count } = generateForm
+  const { count, constraints } = generateForm
 
   // 关闭对话框
   generateDialogVisible.value = false
@@ -250,7 +251,12 @@ const generateRandomData = async () => {
 
     // 根据列定义生成数据
     columns.value.forEach(col => {
-      if (col.key === 'id') {
+      // 优先使用用户填写的约束信息
+      const constraint = constraints[col.key]
+      if (constraint && constraint.trim()) {
+        // 如果有约束信息，使用约束描述作为基础生成数据
+        row[col.key] = generateDataFromConstraint(constraint, col, startId + i)
+      } else if (col.key === 'id') {
         row[col.key] = `${startId + i}`
       } else if (col.enumOptions && col.enumOptions.length > 0) {
         // 如果列有枚举选项，随机选择一个
@@ -294,6 +300,11 @@ const generateRandomData = async () => {
 // 重置生成表单
 const resetGenerateForm = () => {
   generateForm.count = 10
+  generateForm.constraints = {}
+  // 根据当前列定义初始化约束信息
+  columns.value.forEach(col => {
+    generateForm.constraints[col.key] = ''
+  })
 }
 
 // 编辑中的单元格
@@ -1697,7 +1708,7 @@ onMounted(() => {
     <el-dialog
       v-model="generateDialogVisible"
       title="一键生成数据"
-      width="400px"
+      width="560px"
       :close-on-click-modal="false"
       @closed="resetGenerateForm"
     >
@@ -1710,6 +1721,27 @@ onMounted(() => {
             :step="10"
           />
           <span class="form-tip">条</span>
+        </el-form-item>
+          <template #label>
+            <div class="constraints-tip">
+              <el-icon><InfoFilled /></el-icon>
+              <span>可为每列填写约束信息，帮助 AI 更精准地生成符合预期的数据</span>
+            </div>
+          </template>
+          <div class="constraints-list">
+            <div v-for="col in columns" :key="col.key" class="constraint-item">
+              <div class="constraint-label">
+                <span class="label-text">{{ col.label }}</span>
+              <span class="label-key">({{ col.key }})</span>
+              <el-input
+                v-model="generateForm.constraints[col.key]"
+                type="textarea"
+                :rows="2"
+                :placeholder="例如：生成1-100之间的随机数"
+                resize="none"
+              />
+            </div>
+          </div>
         </el-form-item>
       </el-form>
 
@@ -2601,4 +2633,66 @@ onMounted(() => {
 .tooltip-content strong {
   color: #3b82f6;
 }
-</style>
+
+.constraints-tip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #606266;
+}
+
+.constraints-tip .el-icon {
+  color: #409eff;
+}
+
+.constraints-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.constraint-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.constraint-item:hover {
+  background: #f0f2f5;
+}
+
+.constraint-label {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 100px;
+}
+
+.label-key {
+  color: #606266;
+  font-size: 12px;
+}
+
+.label-key {
+  color: #909399;
+  font-size: 12px;
+  background: #e4e7ed;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.constraint-item .el-input {
+  flex: 1;
+}
+
+.constraint-item .el-textarea {
+  flex: 1;
+}

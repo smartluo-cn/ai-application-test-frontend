@@ -14,6 +14,8 @@ import {
   Search,
   Collection,
   QuestionFilled,
+  DataLine,
+  WarningFilled,
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -1329,7 +1331,7 @@ const handleDictSizeChange = (size) => {
                   v-for="col in dict.columns.slice(0, 4)"
                   :key="col.key"
                   size="small"
-                  :type="col.type === 'enum' ? 'warning' : 'info'"
+                  :type="col.type === 'number' ? 'success' : (col.type === 'enum' ? 'warning' : 'info')"
                   effect="plain"
                 >
                   {{ col.label }} ({{ getColumnTypeText(col.type) }})
@@ -1353,7 +1355,7 @@ const handleDictSizeChange = (size) => {
               </div>
               <div class="card-actions">
                 <el-button text type="primary" size="small" @click="goToDictionaryDetail(dict.id)"
-                  >查看</el-button
+                  >查看详情</el-button
                 >
                 <el-button text type="primary" size="small" @click="openEditDictionaryDialog(dict)"
                   >编辑</el-button
@@ -1604,103 +1606,140 @@ const handleDictSizeChange = (size) => {
     <el-dialog
       v-model="dictionaryDialogVisible"
       :title="dictionaryDialogTitle"
-      width="600px"
+      width="680px"
       :close-on-click-modal="false"
+      class="dictionary-dialog"
     >
-      <el-form
-        ref="dictionaryFormRef"
-        :model="dictionaryForm"
-        :rules="dictionaryFormRules"
-        label-width="80px"
-        label-position="left"
-      >
-        <el-form-item label="名称" prop="name">
-          <el-input
-            v-model="dictionaryForm.name"
-            placeholder="请输入数据字典名称"
-            maxlength="50"
-            show-word-limit
-          />
-        </el-form-item>
-
-        <el-form-item label="字段定义">
-          <div class="columns-form">
-            <div
-              v-for="(column, index) in dictionaryForm.columns"
-              :key="index"
-              class="column-item"
+      <div class="dictionary-form-container">
+        <!-- 基本信息 -->
+        <div class="form-section">
+          <div class="section-header">
+            <div class="section-icon basic-icon">
+              <el-icon><Collection /></el-icon>
+            </div>
+            <span class="section-title">基本信息</span>
+          </div>
+          <div class="section-content">
+            <el-form
+              ref="dictionaryFormRef"
+              :model="dictionaryForm"
+              :rules="dictionaryFormRules"
+              label-width="80px"
+              label-position="left"
             >
-              <div class="column-header">
-                <span class="column-index">字段 {{ index + 1 }}</span>
+              <el-form-item label="名称" prop="name">
+                <el-input
+                  v-model="dictionaryForm.name"
+                  placeholder="请输入数据字典名称，如：通用对话测试"
+                  maxlength="50"
+                  show-word-limit
+                />
+              </el-form-item>
+            </el-form>
+          </div>
+        </div>
+
+        <!-- 字段定义 -->
+        <div class="form-section">
+          <div class="section-header">
+            <div class="section-icon field-icon">
+              <el-icon><DataLine /></el-icon>
+            </div>
+            <span class="section-title">字段定义</span>
+            <el-tooltip content="定义数据字典的列结构，用于测试数据的输入和输出" placement="top">
+              <el-icon class="section-help"><QuestionFilled /></el-icon>
+            </el-tooltip>
+          </div>
+          <div class="section-content">
+            <div class="columns-form">
+              <div
+                v-for="(column, index) in dictionaryForm.columns"
+                :key="index"
+                class="column-item"
+              >
+                <div class="column-header">
+                  <span class="column-index">
+                    <span class="index-num">{{ index + 1 }}</span>
+                    <span class="index-label">字段</span>
+                  </span>
+                  <el-button
+                    v-if="dictionaryForm.columns.length > 1"
+                    type="danger"
+                    link
+                    size="small"
+                    @click="removeDictionaryColumn(index)"
+                  >
+                    <el-icon><Delete /></el-icon>
+                    删除
+                  </el-button>
+                </div>
+                <div class="column-row">
+                  <div class="column-field">
+                    <label class="field-label"><span class="required">*</span> 字段Key</label>
+                    <el-input v-model="column.key" placeholder="如: id" />
+                  </div>
+                  <div class="column-field">
+                    <label class="field-label"><span class="required">*</span> 字段名称</label>
+                    <el-input v-model="column.label" placeholder="如: ID" />
+                  </div>
+                  <div class="column-field">
+                    <label class="field-label">字段类型</label>
+                    <el-select v-model="column.type" placeholder="选择类型">
+                      <el-option label="字符串" value="string" />
+                      <el-option label="数字" value="number" />
+                      <el-option label="枚举" value="enum" />
+                    </el-select>
+                  </div>
+                </div>
+                <!-- 数字类型额外配置 -->
+                <div v-if="column.type === 'number'" class="column-extra">
+                  <div class="column-field column-field-small">
+                    <label class="field-label">最小值</label>
+                    <el-input v-model="column.min" placeholder="可选" type="number" />
+                  </div>
+                  <div class="column-field column-field-small">
+                    <label class="field-label">最大值</label>
+                    <el-input v-model="column.max" placeholder="可选" type="number" />
+                  </div>
+                </div>
+                <!-- 枚举类型额外配置 -->
+                <div v-if="column.type === 'enum'" class="column-extra">
+                  <div class="column-field column-field-full">
+                    <label class="field-label">枚举值</label>
+                    <el-input
+                      v-model="column.enumOptions"
+                      placeholder="多个枚举值用逗号分隔，如: 选项1,选项2,选项3"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="column-actions">
                 <el-button
-                  v-if="dictionaryForm.columns.length > 1"
-                  type="danger"
+                  v-if="dictionaryForm.columns.length < 10"
+                  type="primary"
                   link
-                  size="small"
-                  @click="removeDictionaryColumn(index)"
+                  :icon="Plus"
+                  @click="addDictionaryColumn"
                 >
-                  删除
+                  添加字段
                 </el-button>
-              </div>
-              <div class="column-row">
-                <div class="column-field">
-                  <label class="field-label"><span class="required">*</span> 字段Key</label>
-                  <el-input v-model="column.key" placeholder="如: id" />
-                </div>
-                <div class="column-field">
-                  <label class="field-label"><span class="required">*</span> 字段名称</label>
-                  <el-input v-model="column.label" placeholder="如: ID" />
-                </div>
-                <div class="column-field">
-                  <label class="field-label">字段类型</label>
-                  <el-select v-model="column.type" placeholder="选择类型">
-                    <el-option label="字符串" value="string" />
-                    <el-option label="数字" value="number" />
-                    <el-option label="枚举" value="enum" />
-                  </el-select>
-                </div>
-              </div>
-              <!-- 数字类型额外配置 -->
-              <div v-if="column.type === 'number'" class="column-extra">
-                <div class="column-field column-field-small">
-                  <label class="field-label">最小值</label>
-                  <el-input v-model="column.min" placeholder="可选" type="number" />
-                </div>
-                <div class="column-field column-field-small">
-                  <label class="field-label">最大值</label>
-                  <el-input v-model="column.max" placeholder="可选" type="number" />
-                </div>
-              </div>
-              <!-- 枚举类型额外配置 -->
-              <div v-if="column.type === 'enum'" class="column-extra">
-                <div class="column-field column-field-full">
-                  <label class="field-label">枚举值</label>
-                  <el-input
-                    v-model="column.enumOptions"
-                    placeholder="多个枚举值用逗号分隔，如: 选项1,选项2,选项3"
-                  />
-                </div>
+                <span v-else class="field-limit-tip">
+                  <el-icon><WarningFilled /></el-icon>
+                  最多支持10个字段
+                </span>
               </div>
             </div>
-            <el-button
-              v-if="dictionaryForm.columns.length < 10"
-              type="primary"
-              link
-              :icon="Plus"
-              @click="addDictionaryColumn"
-            >
-              添加字段
-            </el-button>
-            <span v-else class="field-limit-tip">最多支持10个字段</span>
           </div>
-        </el-form-item>
-      </el-form>
+        </div>
+      </div>
 
       <template #footer>
-        <el-button @click="dictionaryDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleDictionarySubmit">
-          {{ isDictionaryEditMode ? '保存修改' : '确定' }}
-        </el-button>
+        <div class="dialog-footer">
+          <el-button @click="dictionaryDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleDictionarySubmit">
+            {{ isDictionaryEditMode ? '保存修改' : '创建' }}
+          </el-button>
+        </div>
       </template>
     </el-dialog>
 
@@ -2433,10 +2472,71 @@ const handleDictSizeChange = (size) => {
 }
 
 /* 数据字典对话框样式 */
+.dictionary-dialog :deep(.el-dialog__body) {
+  padding: 0;
+}
+
+.dictionary-form-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.form-section {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.form-section:last-child {
+  border-bottom: none;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  background: #fafbfc;
+}
+
+.section-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.basic-icon {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.field-icon {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.section-help {
+  color: #909399;
+  cursor: help;
+  margin-left: auto;
+}
+
+.section-content {
+  padding: 20px;
+}
+
 .columns-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .column-item {
@@ -2444,6 +2544,11 @@ const handleDictSizeChange = (size) => {
   background: #f8f9fa;
   border-radius: 8px;
   border: 1px solid #e9ecef;
+  transition: border-color 0.2s;
+}
+
+.column-item:hover {
+  border-color: #d0d5dd;
 }
 
 .column-header {
@@ -2454,6 +2559,25 @@ const handleDictSizeChange = (size) => {
 }
 
 .column-index {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.index-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.index-label {
   font-size: 13px;
   font-weight: 500;
   color: #606266;
@@ -2502,9 +2626,22 @@ const handleDictSizeChange = (size) => {
   width: 100%;
 }
 
+.column-actions {
+  padding-top: 8px;
+}
+
 .field-limit-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
-  color: #909399;
+  color: #e6a23c;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 /* 查看数据字典详情样式 */

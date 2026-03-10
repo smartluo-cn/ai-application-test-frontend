@@ -99,16 +99,35 @@ const openChat = () => {
     </nav>
 
     <div class="sidebar-footer">
-      <div class="ai-assistant-btn" @click="openChat">
-        <div class="ai-icon">
-          <el-icon :size="20"><ChatDotRound /></el-icon>
+      <Transition name="ai-btn" mode="out-in">
+        <div v-if="!chatVisible" class="ai-assistant-btn" @click="openChat">
+          <div class="ai-icon">
+            <div class="icon-pulse"></div>
+            <el-icon :size="20"><ChatDotRound /></el-icon>
+          </div>
+          <div class="ai-info">
+            <span class="ai-title">AI 助手</span>
+            <span class="ai-desc">随时为您解答</span>
+          </div>
+          <div class="ai-badge">
+            <span class="badge-dot"></span>
+          </div>
+          <div class="ai-sparkle">
+            <span class="sparkle"></span>
+            <span class="sparkle"></span>
+            <span class="sparkle"></span>
+          </div>
         </div>
-        <div class="ai-info">
-          <span class="ai-title">AI助手</span>
-          <span class="ai-desc">随时为您解答</span>
+        <div v-else class="ai-assistant-btn active" @click="chatVisible = false">
+          <div class="ai-icon">
+            <el-icon :size="20"><ChatDotRound /></el-icon>
+          </div>
+          <div class="ai-info">
+            <span class="ai-title">关闭助手</span>
+            <span class="ai-desc">点击收起面板</span>
+          </div>
         </div>
-        <div class="ai-badge"></div>
-      </div>
+      </Transition>
     </div>
 
     <!-- AI聊天框 -->
@@ -254,75 +273,219 @@ const openChat = () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px;
-  border-radius: 12px;
+  padding: 14px;
+  border-radius: 14px;
   background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
-  border: 1px solid #c7d2fe;
+  border: 1px solid rgba(199, 210, 254, 0.6);
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   position: relative;
   overflow: hidden;
 }
 
+.ai-assistant-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
 .ai-assistant-btn:hover {
-  background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.2);
+}
+
+.ai-assistant-btn:hover::before {
+  opacity: 1;
+}
+
+.ai-assistant-btn:hover .ai-icon {
+  background: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.ai-assistant-btn:hover .ai-title {
+  color: #fff;
+}
+
+.ai-assistant-btn:hover .ai-desc {
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .ai-assistant-btn:active {
-  transform: translateY(0);
+  transform: translateY(0) scale(0.98);
+}
+
+.ai-assistant-btn.active {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-color: transparent;
+}
+
+.ai-assistant-btn.active .ai-title {
+  color: #fff;
+}
+
+.ai-assistant-btn.active .ai-desc {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.ai-assistant-btn.active .ai-icon {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .ai-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
   background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
   flex-shrink: 0;
+  position: relative;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.icon-pulse {
+  position: absolute;
+  inset: -4px;
+  border-radius: 16px;
+  border: 2px solid rgba(99, 102, 241, 0.3);
+  animation: icon-pulse 2s ease-in-out infinite;
+}
+
+@keyframes icon-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0;
+  }
 }
 
 .ai-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   flex: 1;
+  position: relative;
+  z-index: 1;
 }
 
 .ai-title {
   font-size: 14px;
   font-weight: 600;
   color: #4f46e5;
+  transition: color 0.3s ease;
 }
 
 .ai-desc {
   font-size: 12px;
   color: #6b7280;
+  transition: color 0.3s ease;
 }
 
 .ai-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.badge-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: #10b981;
-  animation: pulse 2s infinite;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+  animation: badge-pulse 2s ease-in-out infinite;
 }
 
-@keyframes pulse {
+@keyframes badge-pulse {
   0%,
   100% {
-    opacity: 1;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
   }
   50% {
-    opacity: 0.5;
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.1);
   }
+}
+
+.ai-sparkle {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.sparkle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #fff;
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.ai-assistant-btn:hover .sparkle {
+  animation: sparkle 0.6s ease-out forwards;
+}
+
+.sparkle:nth-child(1) {
+  top: 20%;
+  left: 10%;
+  animation-delay: 0s;
+}
+
+.sparkle:nth-child(2) {
+  top: 60%;
+  right: 15%;
+  animation-delay: 0.1s;
+}
+
+.sparkle:nth-child(3) {
+  bottom: 25%;
+  left: 30%;
+  animation-delay: 0.2s;
+}
+
+@keyframes sparkle {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0) translateY(-10px);
+  }
+}
+
+/* AI按钮切换动画 */
+.ai-btn-enter-active,
+.ai-btn-leave-active {
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.ai-btn-enter-from {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.ai-btn-leave-to {
+  opacity: 0;
+  transform: scale(0.9);
 }
 
 /* 自定义滚动条 */

@@ -1,6 +1,7 @@
 <script setup>
-import { ref, nextTick, computed } from 'vue'
-import { ChatDotRound, Close, Position } from '@element-plus/icons-vue'
+import { ref, nextTick, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ChatDotRound, Close, Position, Delete, ArrowDown } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 
 const props = defineProps({
   visible: {
@@ -19,6 +20,46 @@ const isOpen = computed({
 const inputMessage = ref('')
 const messagesContainer = ref(null)
 const isTyping = ref(false)
+const showScrollButton = ref(false)
+
+// 拖拽调整高度
+const chatHeight = ref(520)
+const minHeight = 300
+const maxHeight = 700
+const isDragging = ref(false)
+
+const startDrag = (e) => {
+  isDragging.value = true
+  document.addEventListener('mousemove', onDrag)
+  document.addEventListener('mouseup', stopDrag)
+  document.body.style.userSelect = 'none'
+  document.body.style.cursor = 'ns-resize'
+}
+
+const onDrag = (e) => {
+  if (!isDragging.value) return
+  const windowHeight = window.innerHeight
+  const newHeight = windowHeight - e.clientY - 24
+  if (newHeight >= minHeight && newHeight <= maxHeight) {
+    chatHeight.value = newHeight
+  }
+}
+
+const stopDrag = () => {
+  isDragging.value = false
+  document.removeEventListener('mousemove', onDrag)
+  document.removeEventListener('mouseup', stopDrag)
+  document.body.style.userSelect = ''
+  document.body.style.cursor = ''
+}
+
+// 预设快捷问题
+const quickQuestions = [
+  { icon: '💡', text: '如何创建测评集？' },
+  { icon: '🔧', text: '环境管理怎么配置？' },
+  { icon: '📊', text: '如何查看测试报告？' },
+  { icon: '🚀', text: '快速入门指南' },
+]
 
 // 消息列表
 const messages = ref([
@@ -54,32 +95,41 @@ const formatTime = (date) => {
 }
 
 // 滚动到底部
-const scrollToBottom = async () => {
+const scrollToBottom = async (smooth = true) => {
   await nextTick()
   if (messagesContainer.value) {
-    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+    messagesContainer.value.scrollTo({
+      top: messagesContainer.value.scrollHeight,
+      behavior: smooth ? 'smooth' : 'instant',
+    })
+  }
+}
+
+// 检查是否显示滚动按钮
+const checkScrollButton = () => {
+  if (messagesContainer.value) {
+    const { scrollTop, scrollHeight, clientHeight } = messagesContainer.value
+    showScrollButton.value = scrollHeight - scrollTop - clientHeight > 100
   }
 }
 
 // 发送消息
-const sendMessage = async () => {
-  if (!inputMessage.value.trim()) return
+const sendMessage = async (content = null) => {
+  const messageContent = content || inputMessage.value.trim()
+  if (!messageContent) return
 
-  // 添加用户消息
   const userMessage = {
     id: Date.now(),
     type: 'user',
-    content: inputMessage.value.trim(),
+    content: messageContent,
     time: new Date(),
   }
   messages.value.push(userMessage)
   inputMessage.value = ''
   await scrollToBottom()
 
-  // 模拟AI正在输入
   isTyping.value = true
 
-  // 模拟AI延迟回复
   setTimeout(async () => {
     isTyping.value = false
     const aiMessage = {
@@ -99,6 +149,19 @@ const handleClose = () => {
   isOpen.value = false
 }
 
+// 清空对话
+const clearMessages = () => {
+  messages.value = [
+    {
+      id: Date.now(),
+      type: 'ai',
+      content: '对话已清空，有什么新问题吗？',
+      time: new Date(),
+    },
+  ]
+  ElMessage.success('对话已清空')
+}
+
 // 处理回车发送
 const handleKeydown = (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
@@ -106,27 +169,95 @@ const handleKeydown = (e) => {
     sendMessage()
   }
 }
+
+// 处理ESC关闭
+const handleEscapeKey = (e) => {
+  if (e.key === 'Escape' && isOpen.value) {
+    handleClose()
+  }
+}
+
+// 监听滚动和键盘事件
+onMounted(() => {
+  if (messagesContainer.value) {
+    messagesContainer.value.addEventListener('scroll', checkScrollButton)
+  }
+  document.addEventListener('keydown', handleEscapeKey)
+})
+
+onUnmounted(() => {
+  if (messagesContainer.value) {
+    messagesContainer.value.removeEventListener('scroll', checkScrollButton)
+  }
+  document.removeEventListener('keydown', handleEscapeKey)
+  document.removeEventListener('mousemove', onDrag)
+  document.removeEventListener('mouseup', stopDrag)
+})
+
+// 监听打开状态，自动滚动到底部
+watch(isOpen, (val) => {
+  if (val) {
+    nextTick(() => scrollToBottom(false))
+  }
+})
 </script>
 
 <template>
   <Teleport to="body">
-    <Transition name="chat-fade">
-      <div v-if="isOpen" class="ai-chat-container">
+    <Transition name="chat-slide">
+      <div v-if="isOpen" class="ai-chat-container" :style="{ height: `${chatHeight}px` }">
+        <!-- 拖拽调整手柄 -->
+        <div
+          class="resize-handle"
+          :class="{ active: isDragging }"
+          @mousedown="startDrag"
+        >
+          <div class="resize-line"></div>
+        </div>
+
+        <!-- 头部 -->
         <div class="chat-header">
           <div class="header-left">
             <div class="ai-avatar">
-              <el-icon :size="20"><ChatDotRound /></el-icon>
+              <div class="avatar-glow"></div>
+              <el-icon :size="22"><ChatDotRound /></el-icon>
             </div>
             <div class="header-info">
-              <span class="header-title">AI助手</span>
-              <span class="header-status">在线</span>
+              <span class="header-title">AI 智能助手</span>
+              <div class="header-status">
+                <span class="status-dot"></span>
+                <span>在线 · 随时为您服务</span>
+              </div>
             </div>
           </div>
-          <el-button class="close-btn" text @click="handleClose">
-            <el-icon :size="20"><Close /></el-icon>
-          </el-button>
+          <div class="header-actions">
+            <el-tooltip content="清空对话" placement="top">
+              <button class="action-btn" @click="clearMessages">
+                <el-icon :size="18"><Delete /></el-icon>
+              </button>
+            </el-tooltip>
+            <el-tooltip content="关闭 (Esc)" placement="top">
+              <button class="action-btn close" @click="handleClose">
+                <el-icon :size="18"><Close /></el-icon>
+              </button>
+            </el-tooltip>
+          </div>
         </div>
 
+        <!-- 快捷问题 -->
+        <div class="quick-questions">
+          <div
+            v-for="(question, index) in quickQuestions"
+            :key="index"
+            class="quick-item"
+            @click="sendMessage(question.text)"
+          >
+            <span class="quick-icon">{{ question.icon }}</span>
+            <span class="quick-text">{{ question.text }}</span>
+          </div>
+        </div>
+
+        <!-- 消息区域 -->
         <div ref="messagesContainer" class="chat-messages">
           <div
             v-for="message in messages"
@@ -134,50 +265,69 @@ const handleKeydown = (e) => {
             class="message-item"
             :class="message.type"
           >
+            <!-- AI消息：头像在左，内容在右 -->
             <div v-if="message.type === 'ai'" class="message-avatar ai">
               <el-icon :size="16"><ChatDotRound /></el-icon>
             </div>
+
+            <!-- 消息内容 -->
             <div class="message-content">
               <div class="message-bubble">{{ message.content }}</div>
               <div class="message-time">{{ formatTime(message.time) }}</div>
             </div>
+
+            <!-- 用户消息：内容在左，头像在右 -->
             <div v-if="message.type === 'user'" class="message-avatar user">
               <span>我</span>
             </div>
           </div>
 
           <!-- 正在输入提示 -->
-          <div v-if="isTyping" class="message-item ai">
-            <div class="message-avatar ai">
-              <el-icon :size="16"><ChatDotRound /></el-icon>
-            </div>
-            <div class="message-content">
-              <div class="message-bubble typing">
-                <span class="typing-dot"></span>
-                <span class="typing-dot"></span>
-                <span class="typing-dot"></span>
+          <Transition name="typing">
+            <div v-if="isTyping" class="message-item ai">
+              <div class="message-avatar ai">
+                <el-icon :size="16"><ChatDotRound /></el-icon>
+              </div>
+              <div class="message-content">
+                <div class="message-bubble typing">
+                  <span class="typing-dot"></span>
+                  <span class="typing-dot"></span>
+                  <span class="typing-dot"></span>
+                </div>
               </div>
             </div>
-          </div>
+          </Transition>
         </div>
 
+        <!-- 滚动到底部按钮 -->
+        <Transition name="fade">
+          <button v-if="showScrollButton" class="scroll-bottom-btn" @click="scrollToBottom()">
+            <el-icon :size="16"><ArrowDown /></el-icon>
+          </button>
+        </Transition>
+
+        <!-- 输入区域 -->
         <div class="chat-input">
-          <el-input
-            v-model="inputMessage"
-            type="textarea"
-            :rows="1"
-            :autosize="{ minRows: 1, maxRows: 4 }"
-            placeholder="输入消息..."
-            resize="none"
-            @keydown="handleKeydown"
-          />
+          <div class="input-wrapper">
+            <el-input
+              v-model="inputMessage"
+              type="textarea"
+              :rows="1"
+              :autosize="{ minRows: 1, maxRows: 4 }"
+              placeholder="输入消息，按 Enter 发送..."
+              resize="none"
+              @keydown="handleKeydown"
+            />
+          </div>
           <el-button
             type="primary"
-            :icon="Position"
-            circle
+            class="send-btn"
             :disabled="!inputMessage.trim()"
-            @click="sendMessage"
-          />
+            @click="sendMessage()"
+          >
+            <el-icon :size="18"><Position /></el-icon>
+            <span>发送</span>
+          </el-button>
         </div>
       </div>
     </Transition>
@@ -187,72 +337,240 @@ const handleKeydown = (e) => {
 <style scoped>
 .ai-chat-container {
   position: fixed;
+  left: 220px;
   right: 24px;
   bottom: 24px;
-  width: 380px;
-  height: 520px;
-  background: #fff;
-  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow:
-    0 12px 32px rgba(0, 0, 0, 0.12),
-    0 4px 12px rgba(0, 0, 0, 0.08);
+    0 20px 60px rgba(0, 0, 0, 0.12),
+    0 8px 24px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   z-index: 2000;
 }
 
+/* 拖拽调整手柄 */
+.resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: ns-resize;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.resize-handle:hover .resize-line,
+.resize-handle.active .resize-line {
+  background: #6366f1;
+  width: 60px;
+}
+
+.resize-line {
+  width: 40px;
+  height: 3px;
+  background: #d1d5db;
+  border-radius: 2px;
+  transition: all 0.2s ease;
+}
+
+.resize-handle.active .resize-line {
+  background: #6366f1;
+}
+
+/* 头部样式 */
 .chat-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  padding-top: 12px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
   color: #fff;
+  position: relative;
+  overflow: hidden;
+}
+
+.chat-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  animation: shimmer 3s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 .header-left {
   display: flex;
   align-items: center;
   gap: 12px;
+  position: relative;
+  z-index: 1;
 }
 
 .ai-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+}
+
+.avatar-glow {
+  position: absolute;
+  inset: -2px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.4), transparent);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .header-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .header-title {
   font-size: 16px;
   font-weight: 600;
+  letter-spacing: 0.3px;
 }
 
 .header-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
-  opacity: 0.85;
+  opacity: 0.9;
 }
 
-.close-btn {
-  color: #fff !important;
-  opacity: 0.8;
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  animation: pulse-dot 2s ease-in-out infinite;
 }
 
-.close-btn:hover {
-  opacity: 1;
-  background: rgba(255, 255, 255, 0.1) !important;
+@keyframes pulse-dot {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.7;
+  }
 }
 
+.header-actions {
+  display: flex;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.action-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: scale(1.05);
+}
+
+.action-btn.close:hover {
+  background: rgba(239, 68, 68, 0.8);
+}
+
+/* 快捷问题 */
+.quick-questions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(248, 250, 252, 0.8);
+  border-bottom: 1px solid rgba(229, 231, 235, 0.6);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.quick-questions::-webkit-scrollbar {
+  display: none;
+}
+
+.quick-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  border-radius: 20px;
+  font-size: 12px;
+  color: #4b5563;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.quick-item:hover {
+  background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+  border-color: #c7d2fe;
+  color: #4f46e5;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+}
+
+.quick-icon {
+  font-size: 14px;
+}
+
+/* 消息区域 */
 .chat-messages {
   flex: 1;
   padding: 16px;
@@ -260,46 +578,52 @@ const handleKeydown = (e) => {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  background: #f8fafc;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
 }
 
 .message-item {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: 10px;
 }
 
 .message-item.user {
-  flex-direction: row-reverse;
+  justify-content: flex-end;
 }
 
 .message-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .message-avatar.ai {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
   color: #fff;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
 }
 
 .message-avatar.user {
-  background: #10b981;
+  background: linear-gradient(135deg, #10b981, #059669);
   color: #fff;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
 }
 
 .message-content {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  max-width: 70%;
+  gap: 6px;
+  max-width: 60%;
+}
+
+.message-item.user {
+  justify-content: flex-end;
 }
 
 .message-item.user .message-content {
@@ -307,24 +631,26 @@ const handleKeydown = (e) => {
 }
 
 .message-bubble {
-  padding: 10px 14px;
-  border-radius: 12px;
+  padding: 12px 16px;
+  border-radius: 16px;
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.6;
   word-break: break-word;
 }
 
 .message-item.ai .message-bubble {
-  background: #fff;
+  background: rgba(255, 255, 255, 0.95);
   color: #374151;
-  border: 1px solid #e5e7eb;
+  border: 1px solid rgba(229, 231, 235, 0.8);
   border-top-left-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .message-item.user .message-bubble {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
   color: #fff;
   border-top-right-radius: 4px;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
 }
 
 .message-time {
@@ -333,19 +659,23 @@ const handleKeydown = (e) => {
   padding: 0 4px;
 }
 
-/* 正在输入动画 */
+.message-item.user .message-time {
+  text-align: right;
+}
+
+/* 打字动画 */
 .message-bubble.typing {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 12px 16px;
+  gap: 5px;
+  padding: 14px 18px;
 }
 
 .typing-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: #9ca3af;
+  background: #a5b4fc;
   animation: typing 1.4s infinite ease-in-out;
 }
 
@@ -369,49 +699,155 @@ const handleKeydown = (e) => {
     opacity: 0.4;
   }
   30% {
-    transform: translateY(-4px);
+    transform: translateY(-6px);
     opacity: 1;
   }
 }
 
+/* 滚动到底部按钮 */
+.scroll-bottom-btn {
+  position: absolute;
+  bottom: 140px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6366f1;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.scroll-bottom-btn:hover {
+  background: #6366f1;
+  color: #fff;
+  transform: translateX(-50%) scale(1.1);
+}
+
+/* 输入区域 */
 .chat-input {
   display: flex;
   align-items: flex-end;
   gap: 12px;
-  padding: 16px;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.95);
+  border-top: 1px solid rgba(229, 231, 235, 0.6);
+}
+
+.input-wrapper {
+  flex: 1;
+  background: #f8fafc;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  transition: all 0.2s ease;
+}
+
+.input-wrapper:focus-within {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
   background: #fff;
-  border-top: 1px solid #e5e7eb;
 }
 
 .chat-input :deep(.el-textarea__inner) {
-  border-radius: 12px;
-  border-color: #e5e7eb;
-  padding: 10px 14px;
+  border: none !important;
+  background: transparent !important;
+  border-radius: 14px;
+  padding: 12px 16px;
   font-size: 14px;
+  line-height: 1.5;
+  box-shadow: none !important;
 }
 
-.chat-input :deep(.el-textarea__inner:focus) {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+.chat-input :deep(.el-textarea__inner::placeholder) {
+  color: #9ca3af;
 }
 
-.chat-input :deep(.el-button.is-circle) {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  flex-shrink: 0;
+.send-btn {
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+}
+
+.send-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.35);
+}
+
+.send-btn:disabled {
+  background: #e5e7eb;
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
 /* 过渡动画 */
-.chat-fade-enter-active,
-.chat-fade-leave-active {
-  transition: all 0.3s ease;
+.chat-slide-enter-active {
+  animation: chat-slide-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.chat-fade-enter-from,
-.chat-fade-leave-to {
+.chat-slide-leave-active {
+  animation: chat-slide-out 0.25s ease-in;
+}
+
+@keyframes chat-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes chat-slide-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+
+/* 打字指示器动画 */
+.typing-enter-active,
+.typing-leave-active {
+  transition: all 0.2s ease;
+}
+
+.typing-enter-from,
+.typing-leave-to {
   opacity: 0;
-  transform: translateY(20px) scale(0.95);
+  transform: translateY(10px);
+}
+
+/* 淡入淡出 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 /* 滚动条样式 */
@@ -430,5 +866,45 @@ const handleKeydown = (e) => {
 
 .chat-messages::-webkit-scrollbar-thumb:hover {
   background: #d1d5db;
+}
+
+/* 无障碍：减少动画 */
+@media (prefers-reduced-motion: reduce) {
+  .chat-slide-enter-active,
+  .chat-slide-leave-active {
+    animation: none;
+  }
+
+  .typing-dot,
+  .avatar-glow,
+  .status-dot,
+  .chat-header::before {
+    animation: none;
+  }
+
+  .quick-item:hover,
+  .action-btn:hover,
+  .send-btn:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .ai-chat-container {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    border-radius: 16px;
+  }
+
+  .quick-questions {
+    padding: 10px 12px;
+  }
+
+  .quick-item {
+    padding: 6px 12px;
+    font-size: 11px;
+  }
 }
 </style>
