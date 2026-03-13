@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   DataAnalysis,
@@ -19,6 +20,8 @@ import {
   Minus,
 } from '@element-plus/icons-vue'
 
+const router = useRouter()
+
 // 搜索和筛选
 const searchKeyword = ref('')
 const selectedTestType = ref('all')
@@ -27,11 +30,6 @@ const dateRange = ref([])
 // 分页
 const currentPage = ref(1)
 const pageSize = ref(10)
-
-// 报告详情对话框
-const detailDialogVisible = ref(false)
-const currentReport = ref(null)
-const detailActiveTab = ref('overview')
 
 // 测试类型选项
 const testTypeOptions = [
@@ -261,9 +259,7 @@ const getScoreLevel = (score) => {
 
 // 查看报告详情
 const viewReportDetail = (report) => {
-  currentReport.value = report
-  detailActiveTab.value = 'overview'
-  detailDialogVisible.value = true
+  router.push(`/result/${report.id}`)
 }
 
 // 导出报告
@@ -526,137 +522,6 @@ const handleSearch = () => {
 
     <!-- 空状态 -->
     <el-empty v-if="total === 0" description="暂无测试报告" />
-
-    <!-- 报告详情对话框 -->
-    <el-dialog
-      v-model="detailDialogVisible"
-      title="测试报告详情"
-      width="900px"
-      :close-on-click-modal="false"
-    >
-      <template v-if="currentReport">
-        <el-tabs v-model="detailActiveTab">
-          <el-tab-pane label="报告概览" name="overview">
-            <el-descriptions :column="2" border>
-              <el-descriptions-item label="报告名称" :span="2">{{ currentReport.name }}</el-descriptions-item>
-              <el-descriptions-item label="关联任务">{{ currentReport.taskName }}</el-descriptions-item>
-              <el-descriptions-item label="测试环境">{{ currentReport.environment }}</el-descriptions-item>
-              <el-descriptions-item label="测试类型">
-                <el-tag :type="getTestTypeTagType(currentReport.testType)" size="small" effect="plain">
-                  {{ getTestTypeText(currentReport.testType) }}
-                </el-tag>
-              </el-descriptions-item>
-              <el-descriptions-item label="执行人">{{ currentReport.executor }}</el-descriptions-item>
-              <el-descriptions-item label="生成时间">{{ currentReport.createdAt }}</el-descriptions-item>
-              <el-descriptions-item label="执行时长">{{ currentReport.duration }}</el-descriptions-item>
-            </el-descriptions>
-
-            <!-- 客观题详情统计 -->
-            <div class="detail-stats" v-if="currentReport.testType === 'objective'">
-              <div class="stat-box">
-                <div class="stat-num">{{ currentReport.totalCases }}</div>
-                <div class="stat-text">总用例数</div>
-              </div>
-              <div class="stat-box success">
-                <div class="stat-num">{{ currentReport.passedCases }}</div>
-                <div class="stat-text">通过</div>
-              </div>
-              <div class="stat-box danger">
-                <div class="stat-num">{{ currentReport.failedCases }}</div>
-                <div class="stat-text">失败</div>
-              </div>
-              <div class="stat-box highlight">
-                <div class="stat-num" :style="{ color: getPassRateColor(currentReport.passRate) }">
-                  {{ currentReport.passRate }}%
-                </div>
-                <div class="stat-text">通过率</div>
-              </div>
-              <div class="stat-box">
-                <div class="stat-num">{{ currentReport.avgResponseTime }}ms</div>
-                <div class="stat-text">平均响应时间</div>
-              </div>
-            </div>
-
-            <!-- 主观题详情统计 -->
-            <div class="detail-stats" v-else>
-              <div class="stat-box">
-                <div class="stat-num">{{ currentReport.totalCases }}</div>
-                <div class="stat-text">总用例数</div>
-              </div>
-              <div class="stat-box primary">
-                <div class="stat-num">{{ currentReport.evaluatedCases }}</div>
-                <div class="stat-text">已评估</div>
-              </div>
-              <div class="stat-box warning">
-                <div class="stat-num">{{ currentReport.pendingCases }}</div>
-                <div class="stat-text">待评估</div>
-              </div>
-              <div class="stat-box highlight">
-                <div class="stat-num" :style="{ color: getScoreLevel(currentReport.avgScore).color }">
-                  {{ currentReport.avgScore }}
-                </div>
-                <div class="stat-text">平均评分</div>
-              </div>
-            </div>
-
-            <!-- 主观题评分分布 -->
-            <div class="score-chart" v-if="currentReport.testType === 'subjective'">
-              <h4>评分分布</h4>
-              <div class="chart-bars">
-                <div class="bar-item">
-                  <div class="bar-label">优秀 (≥90)</div>
-                  <div class="bar-wrapper">
-                    <div class="bar excellent" :style="{ width: (currentReport.scoreDistribution.excellent / currentReport.totalCases * 100) + '%' }"></div>
-                  </div>
-                  <div class="bar-value">{{ currentReport.scoreDistribution.excellent }}</div>
-                </div>
-                <div class="bar-item">
-                  <div class="bar-label">良好 (75-89)</div>
-                  <div class="bar-wrapper">
-                    <div class="bar good" :style="{ width: (currentReport.scoreDistribution.good / currentReport.totalCases * 100) + '%' }"></div>
-                  </div>
-                  <div class="bar-value">{{ currentReport.scoreDistribution.good }}</div>
-                </div>
-                <div class="bar-item">
-                  <div class="bar-label">中等 (60-74)</div>
-                  <div class="bar-wrapper">
-                    <div class="bar medium" :style="{ width: (currentReport.scoreDistribution.medium / currentReport.totalCases * 100) + '%' }"></div>
-                  </div>
-                  <div class="bar-value">{{ currentReport.scoreDistribution.medium }}</div>
-                </div>
-                <div class="bar-item">
-                  <div class="bar-label">较差 (&lt;60)</div>
-                  <div class="bar-wrapper">
-                    <div class="bar poor" :style="{ width: (currentReport.scoreDistribution.poor / currentReport.totalCases * 100) + '%' }"></div>
-                  </div>
-                  <div class="bar-value">{{ currentReport.scoreDistribution.poor }}</div>
-                </div>
-              </div>
-            </div>
-          </el-tab-pane>
-
-          <el-tab-pane label="用例详情" name="cases">
-            <el-table :data="[]" style="width: 100%">
-              <el-table-column prop="id" label="用例ID" width="100" />
-              <el-table-column prop="input" label="输入" />
-              <el-table-column prop="expected" label="期望输出" />
-              <el-table-column prop="actual" label="实际输出" />
-              <el-table-column prop="status" label="状态" width="80" />
-            </el-table>
-            <el-empty description="用例详情数据加载中..." />
-          </el-tab-pane>
-
-          <el-tab-pane label="性能分析" name="performance">
-            <el-empty description="性能分析图表展示区域" />
-          </el-tab-pane>
-        </el-tabs>
-      </template>
-
-      <template #footer>
-        <el-button @click="detailDialogVisible = false">关闭</el-button>
-        <el-button type="primary" :icon="Download" @click="exportReport(currentReport)">导出报告</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -978,118 +843,5 @@ const handleSearch = () => {
   justify-content: flex-end;
   margin-top: 24px;
   padding-top: 16px;
-}
-
-/* 详情统计 */
-.detail-stats {
-  display: flex;
-  justify-content: space-around;
-  margin-top: 20px;
-  padding: 20px;
-  background: #f5f7fa;
-  border-radius: 8px;
-}
-
-.stat-box {
-  text-align: center;
-}
-
-.stat-box .stat-num {
-  font-size: 32px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.stat-box.success .stat-num {
-  color: #67c23a;
-}
-
-.stat-box.danger .stat-num {
-  color: #f56c6c;
-}
-
-.stat-box.primary .stat-num {
-  color: #409eff;
-}
-
-.stat-box.warning .stat-num {
-  color: #e6a23c;
-}
-
-.stat-box .stat-text {
-  font-size: 13px;
-  color: #909399;
-  margin-top: 4px;
-}
-
-/* 评分分布图表 */
-.score-chart {
-  margin-top: 20px;
-  padding: 20px;
-  background: #f5f7fa;
-  border-radius: 8px;
-}
-
-.score-chart h4 {
-  margin: 0 0 16px 0;
-  font-size: 14px;
-  color: #303133;
-}
-
-.chart-bars {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.bar-item {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.bar-label {
-  width: 80px;
-  font-size: 13px;
-  color: #606266;
-  flex-shrink: 0;
-}
-
-.bar-wrapper {
-  flex: 1;
-  height: 20px;
-  background: #e4e7ed;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.bar {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.3s ease;
-}
-
-.bar.excellent {
-  background: linear-gradient(90deg, #67c23a, #85ce61);
-}
-
-.bar.good {
-  background: linear-gradient(90deg, #409eff, #66b1ff);
-}
-
-.bar.medium {
-  background: linear-gradient(90deg, #e6a23c, #f0c78a);
-}
-
-.bar.poor {
-  background: linear-gradient(90deg, #f56c6c, #f89898);
-}
-
-.bar-value {
-  width: 40px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #303133;
-  text-align: right;
 }
 </style>

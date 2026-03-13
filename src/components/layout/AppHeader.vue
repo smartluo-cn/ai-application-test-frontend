@@ -11,8 +11,8 @@ const getPageTitle = () => {
     '/dataset': '测评集管理',
     '/environment': '环境管理',
     '/plugin': '插件管理',
-    '/execution': '测试执行',
-    '/result': '测试结果',
+    '/execution': '任务管理',
+    '/result': '报告管理',
   }
   return titleMap[route.path] || 'AI应用测试平台'
 }

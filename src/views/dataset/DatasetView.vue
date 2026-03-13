@@ -16,6 +16,9 @@ import {
   QuestionFilled,
   DataLine,
   WarningFilled,
+  Headset,
+  Picture,
+  VideoCamera,
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -206,6 +209,7 @@ const dialogTitle = computed(() => (isEditMode.value ? '编辑测评集' : '新�
 // 搜索和筛选
 const searchKeyword = ref('')
 const selectedTestType = ref('all')
+const selectedMediaType = ref('all')
 
 // 表单数据
 const formData = reactive({
@@ -213,11 +217,81 @@ const formData = reactive({
   iconType: 'preset',
   icon: 'ChatDotRound',
   customIconUrl: '',
+  mediaType: 'text', // 媒体类型：text/audio/image/video
   testType: 'objective',
   tags: [],
   description: '',
   dictionaryId: '', // 关联的数据字典ID
 })
+
+// 媒体类型选项
+const mediaTypeOptions = [
+  { value: 'text', label: '文本', icon: 'Document', color: '#67C23A', desc: '文本类测评数据' },
+  { value: 'audio', label: '语音', icon: 'Headset', color: '#E6A23C', desc: '语音文件测评数据' },
+  { value: 'image', label: '图片', icon: 'Picture', color: '#409EFF', desc: '图片文件测评数据' },
+  { value: 'video', label: '视频', icon: 'VideoCamera', color: '#F56C6C', desc: '视频文件测评数据' },
+]
+
+// 获取媒体类型颜色
+const getMediaTypeColor = (mediaType) => {
+  const option = mediaTypeOptions.find((opt) => opt.value === mediaType)
+  return option?.color || '#909399'
+}
+
+// 获取媒体类型渐变色（用于卡片图标背景）
+const getMediaTypeGradient = (mediaType) => {
+  const gradients = {
+    text: 'linear-gradient(135deg, #67C23A 0%, #4CAF50 100%)',
+    audio: 'linear-gradient(135deg, #E6A23C 0%, #FF9800 100%)',
+    image: 'linear-gradient(135deg, #409EFF 0%, #2196F3 100%)',
+    video: 'linear-gradient(135deg, #F56C6C 0%, #E91E63 100%)',
+  }
+  return gradients[mediaType] || gradients.text
+}
+
+// 获取媒体类型图标
+const getMediaTypeIcon = (mediaType) => {
+  const iconMap = {
+    text: Document,
+    audio: Headset,
+    image: Picture,
+    video: VideoCamera,
+  }
+  return iconMap[mediaType] || Document
+}
+
+// 获取媒体类型文本
+const getMediaTypeText = (mediaType) => {
+  const option = mediaTypeOptions.find((opt) => opt.value === mediaType)
+  return option?.label || '文本'
+}
+
+// 获取媒体类型图标组件
+const getMediaTypeIconComponent = (iconName) => {
+  const iconMap = {
+    Document,
+    Headset,
+    Picture,
+    VideoCamera,
+  }
+  return iconMap[iconName] || Document
+}
+
+// 媒体类型相关的近义词映射
+const mediaTypeSynonyms = {
+  text: ['文本', '文字', '文档'],
+  audio: ['语音', '音频', '声音'],
+  image: ['图片', '图像', '照片'],
+  video: ['视频', '影像'],
+}
+
+// 获取过滤后的标签（移除与媒体类型重复的标签及近义词）
+const getFilteredTags = (dataset) => {
+  if (!dataset.tags) return []
+  const mediaType = dataset.mediaType || 'text'
+  const synonyms = mediaTypeSynonyms[mediaType] || []
+  return dataset.tags.filter(tag => !synonyms.includes(tag))
+}
 
 // 测试类型选项
 const testTypeOptions = [
@@ -232,7 +306,7 @@ const getTestTypeText = (testType) => {
 
 // 获取测试类型标签类型
 const getTestTypeTagType = (testType) => {
-  return testType === 'subjective' ? 'warning' : ''
+  return testType === 'subjective' ? 'warning' : undefined
 }
 
 // 预置标签列表
@@ -474,6 +548,7 @@ const openEditDialog = (dataset) => {
   formData.iconType = dataset.iconType
   formData.icon = dataset.icon || 'ChatDotRound'
   formData.customIconUrl = dataset.customIconUrl || ''
+  formData.mediaType = dataset.mediaType || 'text'
   formData.testType = dataset.testType || 'objective'
   formData.tags = [...dataset.tags]
   formData.description = dataset.description
@@ -486,6 +561,7 @@ const resetForm = () => {
   formData.iconType = 'preset'
   formData.icon = 'ChatDotRound'
   formData.customIconUrl = ''
+  formData.mediaType = 'text'
   formData.testType = 'objective'
   formData.tags = []
   formData.description = ''
@@ -539,6 +615,7 @@ const handleSubmit = async () => {
               icon: formData.iconType === 'preset' ? formData.icon : '',
               customIconUrl:
                 formData.iconType === 'custom' ? formData.customIconUrl : undefined,
+              mediaType: formData.mediaType || 'text',
               testType: formData.testType,
               tags: [...formData.tags],
               description: formData.description,
@@ -559,6 +636,7 @@ const handleSubmit = async () => {
           icon: formData.iconType === 'preset' ? formData.icon : '',
           customIconUrl:
             formData.iconType === 'custom' ? formData.customIconUrl : undefined,
+          mediaType: formData.mediaType || 'text',
           testType: formData.testType,
           tags: [...formData.tags],
           description: formData.description,
@@ -1050,6 +1128,7 @@ const allDatasets = ref([
     name: 'API调用测评集',
     icon: 'Cpu',
     iconType: 'preset',
+    mediaType: 'text',
     testType: 'objective',
     tags: ['API', '工具'],
     description: '包含API调用决策和参数生成任务，用于评估模型的工具使用能力',
@@ -1058,11 +1137,258 @@ const allDatasets = ref([
     createdAt: '2024-02-26',
     updatedAt: '2024-02-26',
   },
+  // 多媒体测评集示例数据
+  {
+    id: '26',
+    name: '语音识别测评集',
+    icon: 'Headset',
+    iconType: 'preset',
+    mediaType: 'audio',
+    testType: 'objective',
+    tags: ['语音', '识别'],
+    description: '包含多种场景的语音识别任务，用于评估模型的语音转文字能力',
+    dataCount: 150,
+    dictionaryId: 'dict-audio-1',
+    createdAt: '2024-03-01',
+    updatedAt: '2024-03-10',
+  },
+  {
+    id: '27',
+    name: '语音情感分析测评集',
+    icon: 'Headset',
+    iconType: 'preset',
+    mediaType: 'audio',
+    testType: 'objective',
+    tags: ['语音', '情感'],
+    description: '包含不同情感的语音片段，用于评估模型的语音情感识别能力',
+    dataCount: 200,
+    dictionaryId: 'dict-audio-2',
+    createdAt: '2024-03-02',
+    updatedAt: '2024-03-10',
+  },
+  {
+    id: '28',
+    name: '图片描述生成测评集',
+    icon: 'Picture',
+    iconType: 'preset',
+    mediaType: 'image',
+    testType: 'subjective',
+    tags: ['图像', '描述'],
+    description: '包含各类图片，用于评估模型的图像理解和描述生成能力',
+    dataCount: 180,
+    dictionaryId: 'dict-image-1',
+    createdAt: '2024-03-03',
+    updatedAt: '2024-03-10',
+  },
+  {
+    id: '29',
+    name: '图像分类测评集',
+    icon: 'Picture',
+    iconType: 'preset',
+    mediaType: 'image',
+    testType: 'objective',
+    tags: ['图像', '分类'],
+    description: '包含多类别图片，用于评估模型的图像分类能力',
+    dataCount: 320,
+    dictionaryId: 'dict-image-2',
+    createdAt: '2024-03-04',
+    updatedAt: '2024-03-10',
+  },
+  {
+    id: '30',
+    name: '视频理解测评集',
+    icon: 'VideoCamera',
+    iconType: 'preset',
+    mediaType: 'video',
+    testType: 'subjective',
+    tags: ['视频', '理解'],
+    description: '包含短视频内容，用于评估模型的视频内容理解和问答能力',
+    dataCount: 80,
+    dictionaryId: 'dict-video-1',
+    createdAt: '2024-03-05',
+    updatedAt: '2024-03-10',
+  },
+  {
+    id: '31',
+    name: '视频动作识别测评集',
+    icon: 'VideoCamera',
+    iconType: 'preset',
+    mediaType: 'video',
+    testType: 'objective',
+    tags: ['视频', '动作'],
+    description: '包含人物动作视频，用于评估模型的动作识别和分类能力',
+    dataCount: 120,
+    dictionaryId: 'dict-video-2',
+    createdAt: '2024-03-06',
+    updatedAt: '2024-03-10',
+  },
+  // 更多语音类型测评集
+  {
+    id: '32',
+    name: '语音指令识别测评集',
+    icon: 'Headset',
+    iconType: 'preset',
+    mediaType: 'audio',
+    testType: 'objective',
+    tags: ['语音', '指令', '智能家居'],
+    description: '包含智能家居场景的语音指令，用于评估模型的语音指令理解和执行能力',
+    dataCount: 180,
+    dictionaryId: 'dict-audio-3',
+    createdAt: '2024-03-07',
+    updatedAt: '2024-03-10',
+  },
+  {
+    id: '33',
+    name: '多语种语音识别测评集',
+    icon: 'Headset',
+    iconType: 'preset',
+    mediaType: 'audio',
+    testType: 'objective',
+    tags: ['语音', '多语种', '翻译'],
+    description: '包含中英日韩等多种语言的语音片段，用于评估模型的跨语言语音识别能力',
+    dataCount: 250,
+    dictionaryId: 'dict-audio-4',
+    createdAt: '2024-03-08',
+    updatedAt: '2024-03-10',
+  },
+  {
+    id: '34',
+    name: '语音合成质量评估集',
+    icon: 'Headset',
+    iconType: 'preset',
+    mediaType: 'audio',
+    testType: 'subjective',
+    tags: ['语音', '合成', 'TTS'],
+    description: '包含TTS合成语音样本，用于评估模型生成语音的自然度和准确性',
+    dataCount: 100,
+    dictionaryId: 'dict-audio-5',
+    createdAt: '2024-03-09',
+    updatedAt: '2024-03-10',
+  },
+  // 更多图片类型测评集
+  {
+    id: '35',
+    name: 'OCR文字识别测评集',
+    icon: 'Picture',
+    iconType: 'preset',
+    mediaType: 'image',
+    testType: 'objective',
+    tags: ['图片', 'OCR', '识别'],
+    description: '包含各类文档、证件、招牌等图片，用于评估模型的文字识别能力',
+    dataCount: 280,
+    dictionaryId: 'dict-image-3',
+    createdAt: '2024-03-10',
+    updatedAt: '2024-03-10',
+  },
+  {
+    id: '36',
+    name: '医学影像分析测评集',
+    icon: 'Picture',
+    iconType: 'preset',
+    mediaType: 'image',
+    testType: 'objective',
+    tags: ['图片', '医学', '分析'],
+    description: '包含X光、CT等医学影像，用于评估模型的医学影像分析能力',
+    dataCount: 150,
+    dictionaryId: 'dict-image-4',
+    createdAt: '2024-03-11',
+    updatedAt: '2024-03-11',
+  },
+  {
+    id: '37',
+    name: '图表理解测评集',
+    icon: 'Picture',
+    iconType: 'preset',
+    mediaType: 'image',
+    testType: 'subjective',
+    tags: ['图片', '图表', '理解'],
+    description: '包含各类统计图表、流程图等，用于评估模型的图表解读和分析能力',
+    dataCount: 200,
+    dictionaryId: 'dict-image-5',
+    createdAt: '2024-03-11',
+    updatedAt: '2024-03-11',
+  },
+  {
+    id: '38',
+    name: '人脸识别测评集',
+    icon: 'Picture',
+    iconType: 'preset',
+    mediaType: 'image',
+    testType: 'objective',
+    tags: ['图片', '人脸', '识别'],
+    description: '包含不同角度、光照条件下的人脸图片，用于评估模型的人脸检测和识别能力',
+    dataCount: 350,
+    dictionaryId: 'dict-image-6',
+    createdAt: '2024-03-12',
+    updatedAt: '2024-03-12',
+  },
+  // 更多视频类型测评集
+  {
+    id: '39',
+    name: '视频摘要生成测评集',
+    icon: 'VideoCamera',
+    iconType: 'preset',
+    mediaType: 'video',
+    testType: 'subjective',
+    tags: ['视频', '摘要', '生成'],
+    description: '包含长视频内容，用于评估模型的视频内容摘要生成能力',
+    dataCount: 60,
+    dictionaryId: 'dict-video-3',
+    createdAt: '2024-03-12',
+    updatedAt: '2024-03-12',
+  },
+  {
+    id: '40',
+    name: '视频问答测评集',
+    icon: 'VideoCamera',
+    iconType: 'preset',
+    mediaType: 'video',
+    testType: 'objective',
+    tags: ['视频', '问答', '理解'],
+    description: '包含视频内容及相关问题，用于评估模型的视频内容理解与问答能力',
+    dataCount: 180,
+    dictionaryId: 'dict-video-4',
+    createdAt: '2024-03-12',
+    updatedAt: '2024-03-12',
+  },
+  {
+    id: '41',
+    name: '视频字幕生成测评集',
+    icon: 'VideoCamera',
+    iconType: 'preset',
+    mediaType: 'video',
+    testType: 'subjective',
+    tags: ['视频', '字幕', '生成'],
+    description: '包含电影、电视剧等视频片段，用于评估模型的视频字幕生成能力',
+    dataCount: 90,
+    dictionaryId: 'dict-video-5',
+    createdAt: '2024-03-12',
+    updatedAt: '2024-03-12',
+  },
+  {
+    id: '42',
+    name: '自动驾驶场景测评集',
+    icon: 'VideoCamera',
+    iconType: 'preset',
+    mediaType: 'video',
+    testType: 'objective',
+    tags: ['视频', '自动驾驶', '场景'],
+    description: '包含各种驾驶场景的视频，用于评估模型的场景理解和目标检测能力',
+    dataCount: 220,
+    dictionaryId: 'dict-video-6',
+    createdAt: '2024-03-12',
+    updatedAt: '2024-03-12',
+  },
 ])
 
 // 过滤后的数据
 const filteredDatasets = computed(() => {
   let result = allDatasets.value
+
+  // 媒体类型筛选
+  if (selectedMediaType.value !== 'all') {
+    result = result.filter(d => (d.mediaType || 'text') === selectedMediaType.value)
+  }
 
   // 测试类型筛选
   if (selectedTestType.value !== 'all') {
@@ -1155,6 +1481,33 @@ const handleDictSizeChange = (size) => {
             style="width: 300px"
             @input="currentPage = 1"
           />
+          <el-select v-model="selectedMediaType" placeholder="媒体类型" style="width: 120px" @change="currentPage = 1">
+            <el-option label="全部媒体" value="all" />
+            <el-option label="文本" value="text">
+              <div class="media-option">
+                <el-icon><Document /></el-icon>
+                <span>文本</span>
+              </div>
+            </el-option>
+            <el-option label="语音" value="audio">
+              <div class="media-option">
+                <el-icon><Headset /></el-icon>
+                <span>语音</span>
+              </div>
+            </el-option>
+            <el-option label="图片" value="image">
+              <div class="media-option">
+                <el-icon><Picture /></el-icon>
+                <span>图片</span>
+              </div>
+            </el-option>
+            <el-option label="视频" value="video">
+              <div class="media-option">
+                <el-icon><VideoCamera /></el-icon>
+                <span>视频</span>
+              </div>
+            </el-option>
+          </el-select>
           <el-select v-model="selectedTestType" placeholder="测试类型" style="width: 120px" @change="currentPage = 1">
             <el-option label="全部类型" value="all" />
             <el-option label="客观题" value="objective" />
@@ -1172,7 +1525,10 @@ const handleDictSizeChange = (size) => {
       >
         <!-- 卡片头部：图标和名称 -->
         <div class="card-header">
-          <div class="icon-wrapper">
+          <div
+            class="icon-wrapper"
+            :style="{ background: getMediaTypeGradient(dataset.mediaType || 'text') }"
+          >
             <img
               v-if="dataset.iconType === 'custom' && dataset.customIconUrl"
               :src="dataset.customIconUrl"
@@ -1182,10 +1538,32 @@ const handleDictSizeChange = (size) => {
             <el-icon v-else :size="32">
               <component :is="getIconComponent(dataset.icon)" />
             </el-icon>
+            <!-- 媒体类型角标 -->
+            <div
+              class="media-type-badge"
+              :style="{ backgroundColor: getMediaTypeColor(dataset.mediaType || 'text') }"
+            >
+              <el-icon :size="10">
+                <component :is="getMediaTypeIcon(dataset.mediaType || 'text')" />
+              </el-icon>
+            </div>
           </div>
           <div class="title-area">
             <h3 class="dataset-name">{{ dataset.name }}</h3>
             <div class="tags">
+              <el-tag
+                class="media-type-tag"
+                :style="{
+                  '--tag-color': getMediaTypeColor(dataset.mediaType || 'text'),
+                  backgroundColor: getMediaTypeColor(dataset.mediaType || 'text') + '15',
+                  borderColor: getMediaTypeColor(dataset.mediaType || 'text') + '40',
+                  color: getMediaTypeColor(dataset.mediaType || 'text')
+                }"
+                size="small"
+                effect="plain"
+              >
+                {{ getMediaTypeText(dataset.mediaType || 'text') }}
+              </el-tag>
               <el-tag
                 :type="getTestTypeTagType(dataset.testType)"
                 size="small"
@@ -1194,7 +1572,7 @@ const handleDictSizeChange = (size) => {
                 {{ getTestTypeText(dataset.testType) }}
               </el-tag>
               <el-tag
-                v-for="tag in dataset.tags"
+                v-for="tag in getFilteredTags(dataset)"
                 :key="tag"
                 size="small"
                 type="info"
@@ -1422,6 +1800,43 @@ const handleDictSizeChange = (size) => {
                 maxlength="50"
                 show-word-limit
               />
+            </el-form-item>
+
+            <el-form-item prop="mediaType">
+              <template #label>
+                <span>媒体类型</span>
+                <el-tooltip placement="top">
+                  <template #content>
+                    <div class="tooltip-content">
+                      <p><strong>文本：</strong>纯文本输入/输出测评</p>
+                      <p><strong>语音：</strong>音频文件输入测评</p>
+                      <p><strong>图片：</strong>图片文件输入测评</p>
+                      <p><strong>视频：</strong>视频文件输入测评</p>
+                    </div>
+                  </template>
+                  <el-icon class="label-tooltip-icon"><QuestionFilled /></el-icon>
+                </el-tooltip>
+              </template>
+              <div class="media-type-selector">
+                <div
+                  v-for="option in mediaTypeOptions"
+                  :key="option.value"
+                  class="media-type-card"
+                  :class="{ active: formData.mediaType === option.value }"
+                  :style="{ '--theme-color': option.color }"
+                  @click="formData.mediaType = option.value"
+                >
+                  <div class="media-icon">
+                    <el-icon :size="28">
+                      <component :is="getMediaTypeIconComponent(option.icon)" />
+                    </el-icon>
+                  </div>
+                  <div class="media-info">
+                    <div class="media-label">{{ option.label }}</div>
+                    <div class="media-desc">{{ option.desc }}</div>
+                  </div>
+                </div>
+              </div>
             </el-form-item>
 
             <el-form-item prop="testType">
@@ -1958,6 +2373,87 @@ const handleDictSizeChange = (size) => {
   margin-bottom: 20px;
 }
 
+/* 媒体类型下拉选项 */
+.media-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 媒体类型选择器 */
+.media-type-selector {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  width: 100%;
+}
+
+.media-type-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 12px;
+  border: 2px solid #e4e7ed;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #fafafa;
+}
+
+.media-type-card:hover {
+  border-color: var(--theme-color, #409eff);
+  background: #fff;
+}
+
+.media-type-card.active {
+  border-color: var(--theme-color, #409eff);
+  background: linear-gradient(to bottom, rgba(64, 158, 255, 0.05), rgba(64, 158, 255, 0.1));
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.15);
+}
+
+.media-type-card.active .media-icon {
+  background: var(--theme-color, #409eff);
+  color: #fff;
+}
+
+.media-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: #f0f2f5;
+  color: #606266;
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+}
+
+.media-info {
+  text-align: center;
+}
+
+.media-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 2px;
+}
+
+.media-desc {
+  font-size: 11px;
+  color: #909399;
+  white-space: nowrap;
+}
+
+/* 媒体类型标签样式 */
+.media-type-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .dataset-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
@@ -2009,6 +2505,7 @@ const handleDictSizeChange = (size) => {
 }
 
 .icon-wrapper {
+  position: relative;
   width: 56px;
   height: 56px;
   display: flex;
@@ -2024,6 +2521,28 @@ const handleDictSizeChange = (size) => {
   width: 32px;
   height: 32px;
   object-fit: contain;
+}
+
+/* 媒体类型角标 */
+.media-type-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  z-index: 1;
+}
+
+/* 媒体类型标签样式 */
+.media-type-tag {
+  font-weight: 500;
+  border-width: 1px;
 }
 
 .title-area {

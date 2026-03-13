@@ -22,8 +22,8 @@ const menuItems = [
   { index: '2', title: '测评集管理', icon: 'FolderOpened', route: '/dataset' },
   { index: '3', title: '环境管理', icon: 'Setting', route: '/environment' },
   { index: '4', title: '插件管理', icon: 'Connection', route: '/plugin' },
-  { index: '5', title: '测试执行', icon: 'VideoPlay', route: '/execution' },
-  { index: '6', title: '测试报告', icon: 'DataAnalysis', route: '/result' },
+  { index: '5', title: '任务管理', icon: 'VideoPlay', route: '/execution' },
+  { index: '6', title: '报告管理', icon: 'DataAnalysis', route: '/result' },
 ]
 
 const iconComponents = {

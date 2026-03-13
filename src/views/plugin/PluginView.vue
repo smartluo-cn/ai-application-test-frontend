@@ -7,7 +7,11 @@ import python from 'highlight.js/lib/languages/python'
 import 'highlight.js/styles/atom-one-dark.css'
 
 // 注册 Python 语法
-hljs.registerLanguage('python', python)
+try {
+  hljs.registerLanguage('python', python)
+} catch (e) {
+  console.warn('Failed to register Python language:', e)
+}
 
 const router = useRouter()
 
@@ -26,6 +30,7 @@ import {
   Cpu,
   FullScreen,
   Collection,
+  Lock,
 } from '@element-plus/icons-vue'
 
 // 搜索关键词
@@ -33,6 +38,23 @@ const searchKeyword = ref('')
 
 // 分类筛选
 const selectedCategory = ref('all')
+
+// 插件来源筛选
+const selectedSource = ref('all')
+
+// 数据类型筛选
+const selectedDataType = ref('all')
+
+// 数据字典筛选
+const selectedDictionary = ref('all')
+
+// 数据类型选项
+const dataTypeOptions = [
+  { value: 'text', label: '文本' },
+  { value: 'audio', label: '音频' },
+  { value: 'image', label: '图片' },
+  { value: 'video', label: '视频' },
+]
 
 // 数据字典列表
 const dataDictionaries = ref([
@@ -81,6 +103,7 @@ const plugins = ref([
     category: 'data',
     tags: ['数据处理', '文本清洗'],
     source: 'system',
+    dataType: 'text',
     dataDictionaryId: 'dict-1',
     code: `def execute(input_data, config):
     import re
@@ -104,6 +127,7 @@ const plugins = ref([
     category: 'data',
     tags: ['数据处理', 'JSON'],
     source: 'custom',
+    dataType: 'text',
     dataDictionaryId: 'dict-4',
     code: `def execute(input_data, config):
     import json
@@ -135,6 +159,7 @@ const plugins = ref([
     category: 'data',
     tags: ['数据处理', '安全'],
     source: 'system',
+    dataType: 'text',
     dataDictionaryId: 'dict-5',
     code: `def execute(input_data, config):
     text = str(input_data)
@@ -167,6 +192,7 @@ const plugins = ref([
     category: 'execution',
     tags: ['测试执行', 'HTTP', 'API'],
     source: 'custom',
+    dataType: 'text',
     dataDictionaryId: 'dict-2',
     code: `def execute(input_data, config):
     import urllib.request
@@ -202,6 +228,7 @@ const plugins = ref([
     category: 'execution',
     tags: ['测试执行', '数据库'],
     source: 'system',
+    dataType: 'text',
     dataDictionaryId: 'dict-2',
     code: `def execute(input_data, config):
     # 数据库查询执行器
@@ -233,6 +260,7 @@ const plugins = ref([
     category: 'evaluation',
     tags: ['结果评估', 'NLP'],
     source: 'custom',
+    dataType: 'text',
     dataDictionaryId: 'dict-3',
     code: `def execute(input_data, config):
     from difflib import SequenceMatcher
@@ -254,6 +282,7 @@ const plugins = ref([
     category: 'evaluation',
     tags: ['结果评估', '性能'],
     source: 'system',
+    dataType: 'text',
     dataDictionaryId: 'dict-1',
     code: `def execute(input_data, config):
     times = input_data if isinstance(input_data, list) else [input_data]
@@ -284,6 +313,7 @@ const plugins = ref([
     category: 'evaluation',
     tags: ['结果评估', '文本匹配'],
     source: 'custom',
+    dataType: 'text',
     dataDictionaryId: 'dict-4',
     code: `def execute(input_data, config):
     import re
@@ -318,6 +348,155 @@ const plugins = ref([
     lastTestTime: '2024-02-28 14:00',
     createdAt: '2024-02-28',
     updatedAt: '2024-02-28',
+  },
+  {
+    id: 'plugin-9',
+    name: 'AI对话执行器',
+    description: '执行AI对话测试，支持单轮和多轮对话场景，自动评估回复质量和一致性',
+    category: 'execution',
+    tags: ['测试执行', 'AI对话', '多轮对话'],
+    source: 'system',
+    dataType: 'audio',
+    dataDictionaryId: 'dict-1',
+    code: `def execute(input_data, config):
+    """
+    AI对话执行器
+    输入数据格式（来自关联的数据字典）:
+    {
+        "id": "对话ID",
+        "prompt": "用户输入的提示",
+        "expected_response": "期望的回复",
+        "context": "上下文信息（多轮对话时使用）"
+    }
+    """
+    import time
+
+    # 获取配置参数
+    model = config.get('model', 'default')
+    max_tokens = config.get('max_tokens', 1024)
+    temperature = config.get('temperature', 0.7)
+    timeout = config.get('timeout', 30)
+
+    # 解析输入数据
+    prompt = input_data.get('prompt', '')
+    expected = input_data.get('expected_response', '')
+    context = input_data.get('context', [])
+
+    # 模拟AI对话执行
+    start_time = time.time()
+
+    # 构建对话历史（用于多轮对话）
+    conversation_history = []
+    for turn in context:
+        conversation_history.append({
+            'role': 'user',
+            'content': turn.get('user', '')
+        })
+        conversation_history.append({
+            'role': 'assistant',
+            'content': turn.get('assistant', '')
+        })
+
+    # 添加当前用户输入
+    conversation_history.append({
+        'role': 'user',
+        'content': prompt
+    })
+
+    # 模拟AI响应（实际应用中调用AI模型API）
+    response = f"[模拟响应] 针对问题 '{prompt[:50]}...' 的回复"
+    if expected:
+        response += f" (期望: {expected[:30]}...)"
+
+    end_time = time.time()
+
+    # 返回执行结果
+    result = {
+        'success': True,
+        'conversation_id': input_data.get('id'),
+        'prompt': prompt,
+        'response': response,
+        'expected_response': expected,
+        'model': model,
+        'turns': len(conversation_history) // 2 + 1,
+        'latency_ms': round((end_time - start_time) * 1000, 2),
+        'tokens_used': {
+            'prompt': len(prompt.split()),
+            'completion': len(response.split()),
+            'total': len(prompt.split()) + len(response.split())
+        },
+        'config': {
+            'max_tokens': max_tokens,
+            'temperature': temperature
+        }
+    }
+
+    return result`,
+    params: [
+      { name: 'model', type: 'string', default: 'claude-3-sonnet', description: 'AI模型名称' },
+      { name: 'max_tokens', type: 'number', default: '1024', description: '最大输出token数' },
+      { name: 'temperature', type: 'number', default: '0.7', description: '生成温度(0-1)' },
+      { name: 'timeout', type: 'number', default: '30', description: '请求超时时间(秒)' },
+    ],
+    status: 'active',
+    testResult: 'success',
+    lastTestTime: '2024-03-12 10:30',
+    createdAt: '2024-03-12',
+    updatedAt: '2024-03-12',
+  },
+  {
+    id: 'plugin-metrics-1',
+    name: '响应性能指标采集',
+    description: '采集API响应时间相关的性能指标，支持平均值、P95、P99等多种聚合方式',
+    category: 'metrics',
+    tags: ['指标采集', '性能'],
+    source: 'system',
+    dataType: 'video',
+    // 指标采集插件不需要 dataDictionaryId, code, params
+    metrics: [
+      {
+        id: 'metric-1',
+        name: 'avg_response_time',
+        displayName: '平均响应时间',
+        source: 'response_time',
+        aggregation: 'avg',
+        unit: 'ms',
+        description: '所有请求的平均响应时间',
+      },
+      {
+        id: 'metric-2',
+        name: 'p95_response_time',
+        displayName: 'P95响应时间',
+        source: 'response_time',
+        aggregation: 'p95',
+        unit: 'ms',
+        description: '95%的请求响应时间在此范围内',
+      },
+      {
+        id: 'metric-3',
+        name: 'error_rate',
+        displayName: '错误率',
+        source: 'status',
+        aggregation: 'percentage',
+        unit: '%',
+        filter: { field: 'status', value: 'error' },
+        description: '请求错误率百分比',
+      },
+      {
+        id: 'metric-4',
+        name: 'total_tokens',
+        displayName: '总Token数',
+        source: 'token_count',
+        aggregation: 'sum',
+        unit: '个',
+        description: '所有请求的总Token消耗',
+      },
+    ],
+    status: 'active',
+    testResult: 'success',
+    lastTestTime: '2024-03-12 14:00',
+    createdAt: '2024-03-12',
+    updatedAt: '2024-03-12',
   },
 ])
 
@@ -472,6 +651,8 @@ const presetTags = [
   '文本匹配',
   '工具',
   '转换',
+  '指标采集',
+  '监控',
 ]
 
 // 获取分类标签
@@ -493,6 +674,21 @@ const filteredPlugins = computed(() => {
   // 分类筛选
   if (selectedCategory.value !== 'all') {
     result = result.filter(p => p.category === selectedCategory.value)
+  }
+
+  // 插件来源筛选
+  if (selectedSource.value !== 'all') {
+    result = result.filter(p => p.source === selectedSource.value)
+  }
+
+  // 数据类型筛选
+  if (selectedDataType.value !== 'all') {
+    result = result.filter(p => p.dataType === selectedDataType.value)
+  }
+
+  // 数据字典筛选
+  if (selectedDictionary.value !== 'all') {
+    result = result.filter(p => p.dataDictionaryId === selectedDictionary.value)
   }
 
   // 关键词搜索
@@ -921,13 +1117,40 @@ const goToDictionaryDetail = (dictId) => {
         style="width: 300px"
         @input="handleSearch"
       />
-      <el-select v-model="selectedCategory" placeholder="分类筛选" style="width: 150px; margin-left: 12px" @change="handleSearch">
+      <el-select v-model="selectedCategory" placeholder="全部分类" style="width: 140px; margin-left: 12px" @change="handleSearch">
         <el-option label="全部分类" value="all" />
         <el-option
           v-for="cat in pluginCategories"
           :key="cat.value"
           :label="cat.label"
           :value="cat.value"
+        />
+      </el-select>
+      <el-select v-model="selectedSource" placeholder="全部来源" style="width: 140px; margin-left: 12px" @change="handleSearch">
+        <el-option label="全部来源" value="all" />
+        <el-option
+          v-for="source in sourceOptions"
+          :key="source.value"
+          :label="source.label"
+          :value="source.value"
+        />
+      </el-select>
+      <el-select v-model="selectedDataType" placeholder="全部数据类型" style="width: 140px; margin-left: 12px" @change="handleSearch">
+        <el-option label="全部数据类型" value="all" />
+        <el-option
+          v-for="type in dataTypeOptions"
+          :key="type.value"
+          :label="type.label"
+          :value="type.value"
+        />
+      </el-select>
+      <el-select v-model="selectedDictionary" placeholder="全部数据字典" style="width: 180px; margin-left: 12px" @change="handleSearch">
+        <el-option label="全部数据字典" value="all" />
+        <el-option
+          v-for="dict in dataDictionaries"
+          :key="dict.id"
+          :label="dict.name"
+          :value="dict.id"
         />
       </el-select>
     </div>
@@ -954,7 +1177,7 @@ const goToDictionaryDetail = (dictId) => {
               </el-tag>
             </div>
             <div class="plugin-meta">
-              <span class="meta-item">
+              <span class="meta-item" v-if="plugin.code && plugin.source !== 'system'">
                 <el-icon><Document /></el-icon>
                 {{ plugin.code.split('\n').length }} 行代码
               </span>
@@ -1020,12 +1243,18 @@ const goToDictionaryDetail = (dictId) => {
           <div class="code-preview">
             <div class="preview-title">
               <span>代码预览</span>
-              <el-button size="small" link type="primary" @click="handleCopyCode(plugin)">
+              <el-button v-if="plugin.source !== 'system'" size="small" link type="primary" @click="handleCopyCode(plugin)">
                 <el-icon><CopyDocument /></el-icon>
                 复制代码
               </el-button>
             </div>
-            <pre class="code-snippet"><code>{{ plugin.code.split('\n').slice(0, 5).join('\n') }}...</code></pre>
+            <!-- 系统插件提示 -->
+            <div v-if="plugin.source === 'system'" class="system-plugin-hint">
+              <el-icon><Lock /></el-icon>
+              <span>系统插件不支持查看代码</span>
+            </div>
+            <!-- 自定义插件代码 -->
+            <pre v-else class="code-snippet"><code>{{ plugin.code?.split('\n').slice(0, 5).join('\n') }}...</code></pre>
           </div>
         </div>
 
@@ -1040,7 +1269,10 @@ const goToDictionaryDetail = (dictId) => {
           </div>
           <div class="card-actions">
             <el-button text type="primary" size="small" @click="goToDetail(plugin.id)">查看详情</el-button>
-            <el-button text type="primary" size="small" @click="openEditDialog(plugin)">编辑</el-button>
+            <el-tooltip v-if="plugin.source === 'system'" content="系统插件不支持编辑" placement="top">
+              <el-button text type="primary" size="small" disabled>编辑</el-button>
+            </el-tooltip>
+            <el-button v-else text type="primary" size="small" @click="openEditDialog(plugin)">编辑</el-button>
           </div>
         </div>
       </el-card>
@@ -1468,6 +1700,23 @@ const goToDictionaryDetail = (dictId) => {
 .code-preview {
   border-top: 1px solid #ebeef5;
   padding-top: 12px;
+}
+
+.system-plugin-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  color: #909399;
+  font-size: 13px;
+  min-height: 77px;
+}
+
+.system-plugin-hint .el-icon {
+  font-size: 16px;
 }
 
 .code-snippet {

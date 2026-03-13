@@ -20,7 +20,11 @@ import {
   List,
   Collection,
   QuestionFilled,
+  Headset,
+  Picture,
+  VideoCamera,
 } from '@element-plus/icons-vue'
+import MediaFileUpload from '@/components/dataset/MediaFileUpload.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as XLSX from 'xlsx'
 
@@ -36,6 +40,7 @@ const dataDictionaries = ref([
     id: 'dict-1',
     name: '通用对话测试',
     description: '用于测试模型的基础对话能力，包含多轮对话、意图识别等测试场景',
+    mediaType: 'text',
     columns: [
       { key: 'id', label: 'ID', type: 'string' },
       { key: 'input', label: '输入', type: 'string' },
@@ -50,6 +55,7 @@ const dataDictionaries = ref([
     id: 'dict-2',
     name: '代码生成测试',
     description: '用于测试模型的代码生成能力',
+    mediaType: 'text',
     columns: [
       { key: 'id', label: 'ID', type: 'string' },
       { key: 'prompt', label: '提示词', type: 'string' },
@@ -62,6 +68,7 @@ const dataDictionaries = ref([
     id: 'dict-3',
     name: '文本摘要测试',
     description: '用于测试模型的文本摘要能力',
+    mediaType: 'text',
     columns: [
       { key: 'id', label: 'ID', type: 'string' },
       { key: 'originalText', label: '原文', type: 'string' },
@@ -69,6 +76,92 @@ const dataDictionaries = ref([
     ],
     createdAt: '2024-02-25',
     updatedAt: '2024-02-26',
+  },
+  // 多媒体数据字典模板
+  {
+    id: 'dict-audio-1',
+    name: '语音识别测试',
+    description: '用于测试模型的语音识别能力',
+    mediaType: 'audio',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'audioFile', label: '语音文件', type: 'audio' },
+      { key: 'duration', label: '时长(秒)', type: 'number' },
+      { key: 'prompt', label: '提示词', type: 'string' },
+      { key: 'expectedOutput', label: '期望输出', type: 'string' },
+    ],
+    createdAt: '2024-03-01',
+    updatedAt: '2024-03-10',
+  },
+  {
+    id: 'dict-audio-2',
+    name: '语音情感分析测试',
+    description: '用于测试模型的语音情感分析能力',
+    mediaType: 'audio',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'audioFile', label: '语音文件', type: 'audio' },
+      { key: 'duration', label: '时长(秒)', type: 'number' },
+      { key: 'expectedEmotion', label: '期望情感', type: 'enum', enumOptions: ['高兴', '悲伤', '愤怒', '平静', '惊讶'] },
+    ],
+    createdAt: '2024-03-02',
+    updatedAt: '2024-03-10',
+  },
+  {
+    id: 'dict-image-1',
+    name: '图片描述生成测试',
+    description: '用于测试模型的图像理解和描述生成能力',
+    mediaType: 'image',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'imageFile', label: '图片文件', type: 'image' },
+      { key: 'prompt', label: '提示词', type: 'string' },
+      { key: 'expectedDescription', label: '期望描述', type: 'string' },
+    ],
+    createdAt: '2024-03-03',
+    updatedAt: '2024-03-10',
+  },
+  {
+    id: 'dict-image-2',
+    name: '图片分类测试',
+    description: '用于测试模型的图片分类能力',
+    mediaType: 'image',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'imageFile', label: '图片文件', type: 'image' },
+      { key: 'expectedCategory', label: '期望分类', type: 'enum', enumOptions: ['人物', '风景', '动物', '物品', '建筑'] },
+    ],
+    createdAt: '2024-03-04',
+    updatedAt: '2024-03-10',
+  },
+  {
+    id: 'dict-video-1',
+    name: '视频理解测试',
+    description: '用于测试模型的视频内容理解和问答能力',
+    mediaType: 'video',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'videoFile', label: '视频文件', type: 'video' },
+      { key: 'duration', label: '时长(秒)', type: 'number' },
+      { key: 'question', label: '问题', type: 'string' },
+      { key: 'expectedAnswer', label: '期望答案', type: 'string' },
+    ],
+    createdAt: '2024-03-05',
+    updatedAt: '2024-03-10',
+  },
+  {
+    id: 'dict-video-2',
+    name: '视频动作识别测试',
+    description: '用于测试模型的动作识别和分类能力',
+    mediaType: 'video',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'videoFile', label: '视频文件', type: 'video' },
+      { key: 'duration', label: '时长(秒)', type: 'number' },
+      { key: 'expectedAction', label: '期望动作', type: 'enum', enumOptions: ['走路', '跑步', '跳跃', '挥手', '坐下'] },
+    ],
+    createdAt: '2024-03-06',
+    updatedAt: '2024-03-10',
   },
 ])
 
@@ -134,6 +227,67 @@ const getTestTypeText = (testType) => {
 // 获取测试类型标签类型
 const getTestTypeTagType = (testType) => {
   return testType === 'subjective' ? 'warning' : ''
+}
+
+// 媒体类型配置
+const mediaTypeOptions = [
+  { value: 'text', label: '文本', icon: Document, color: '#67C23A', desc: '文本类测评数据' },
+  { value: 'audio', label: '语音', icon: Headset, color: '#E6A23C', desc: '语音文件测评数据' },
+  { value: 'image', label: '图片', icon: Picture, color: '#409EFF', desc: '图片文件测评数据' },
+  { value: 'video', label: '视频', icon: VideoCamera, color: '#F56C6C', desc: '视频文件测评数据' },
+]
+
+// 获取媒体类型配置
+const getMediaTypeConfig = (mediaType) => {
+  return mediaTypeOptions.find((opt) => opt.value === (mediaType || 'text'))
+}
+
+// 获取媒体类型颜色
+const getMediaTypeColor = (mediaType) => {
+  return getMediaTypeConfig(mediaType)?.color || '#909399'
+}
+
+// 获取媒体类型文本
+const getMediaTypeText = (mediaType) => {
+  return getMediaTypeConfig(mediaType)?.label || '文本'
+}
+
+// 获取媒体类型图标
+const getMediaTypeIcon = (mediaType) => {
+  const config = getMediaTypeConfig(mediaType)
+  return config?.icon || Document
+}
+
+// 获取媒体类型图标名称（用于模板）
+const getMediaTypeIconName = (mediaType) => {
+  const iconMap = {
+    text: 'Document',
+    audio: 'Headset',
+    image: 'Picture',
+    video: 'VideoCamera',
+  }
+  return iconMap[mediaType] || 'Document'
+}
+
+// 是否为多媒体类型
+const isMediaType = computed(() => {
+  const mediaType = dataset.value?.mediaType || 'text'
+  return ['audio', 'image', 'video'].includes(mediaType)
+})
+
+// 文件上传组件引用
+const mediaUploadRef = ref(null)
+
+// 处理文件上传
+const handleFileUpload = (file) => {
+  console.log('File uploaded:', file)
+  // TODO: 添加文件到测试数据
+}
+
+// 处理文件删除
+const handleFileRemove = (file) => {
+  console.log('File removed:', file)
+  // TODO: 从测试数据中移除文件
 }
 
 // 图标选项
@@ -496,6 +650,7 @@ const loadDataset = () => {
       name: '通用对话测评集',
       icon: 'ChatDotRound',
       iconType: 'preset',
+      mediaType: 'text',
       testType: 'objective',
       tags: ['对话', '通用'],
       description:
@@ -510,6 +665,7 @@ const loadDataset = () => {
       name: '代码生成测评集',
       icon: 'Cpu',
       iconType: 'preset',
+      mediaType: 'text',
       testType: 'objective',
       tags: ['代码', '编程'],
       description: '包含多种编程语言的代码生成任务，用于评估模型的代码生成能力。',
@@ -523,6 +679,7 @@ const loadDataset = () => {
       name: '文档摘要测评集',
       icon: 'Document',
       iconType: 'preset',
+      mediaType: 'text',
       testType: 'subjective',
       tags: ['摘要', '生成'],
       description: '包含新闻摘要、论文摘要等任务，用于评估模型的文本摘要能力。',
@@ -536,6 +693,7 @@ const loadDataset = () => {
       name: '阅读理解测评集',
       icon: 'DataAnalysis',
       iconType: 'preset',
+      mediaType: 'text',
       testType: 'objective',
       tags: ['问答', '检索'],
       description: '包含基于上下文的问答任务，用于评估模型的阅读理解和信息提取能力。',
@@ -549,6 +707,7 @@ const loadDataset = () => {
       name: 'SQL生成测评集',
       icon: 'Cpu',
       iconType: 'preset',
+      mediaType: 'text',
       testType: 'objective',
       tags: ['SQL', '数据库'],
       description: '包含自然语言转SQL的任务，用于评估模型的数据库查询生成能力。',
@@ -562,6 +721,7 @@ const loadDataset = () => {
       name: '情感分析测评集',
       icon: 'ChatDotRound',
       iconType: 'preset',
+      mediaType: 'text',
       testType: 'objective',
       tags: ['情感', 'NLP'],
       description: '包含文本情感分类、情绪识别等任务，用于评估模型的情感理解能力。',
@@ -570,6 +730,93 @@ const loadDataset = () => {
       createdAt: '2024-02-17',
       updatedAt: '2024-02-26',
     },
+    // 音频类型测评集
+    '26': {
+      id: '26',
+      name: '语音识别测评集',
+      icon: 'Headset',
+      iconType: 'preset',
+      mediaType: 'audio',
+      testType: 'objective',
+      tags: ['语音', '识别'],
+      description: '包含多种场景的语音识别任务，用于评估模型的语音转文字能力',
+      dataCount: 150,
+      dictionaryId: 'dict-audio-1',
+      createdAt: '2024-03-01',
+      updatedAt: '2024-03-10',
+    },
+    '27': {
+      id: '27',
+      name: '语音情感分析测评集',
+      icon: 'Headset',
+      iconType: 'preset',
+      mediaType: 'audio',
+      testType: 'objective',
+      tags: ['语音', '情感'],
+      description: '包含不同情感的语音片段，用于评估模型的语音情感识别能力',
+      dataCount: 200,
+      dictionaryId: 'dict-audio-2',
+      createdAt: '2024-03-02',
+      updatedAt: '2024-03-10',
+    },
+    // 图片类型测评集
+    '28': {
+      id: '28',
+      name: '图片描述生成测评集',
+      icon: 'Picture',
+      iconType: 'preset',
+      mediaType: 'image',
+      testType: 'subjective',
+      tags: ['图像', '描述'],
+      description: '包含各类图片，用于评估模型的图像理解和描述生成能力',
+      dataCount: 180,
+      dictionaryId: 'dict-image-1',
+      createdAt: '2024-03-03',
+      updatedAt: '2024-03-10',
+    },
+    '29': {
+      id: '29',
+      name: '图像分类测评集',
+      icon: 'Picture',
+      iconType: 'preset',
+      mediaType: 'image',
+      testType: 'objective',
+      tags: ['图像', '分类'],
+      description: '包含多类别图片，用于评估模型的图像分类能力',
+      dataCount: 320,
+      dictionaryId: 'dict-image-2',
+      createdAt: '2024-03-04',
+      updatedAt: '2024-03-10',
+    },
+    // 视频类型测评集
+    '30': {
+      id: '30',
+      name: '视频理解测评集',
+      icon: 'VideoCamera',
+      iconType: 'preset',
+      mediaType: 'video',
+      testType: 'subjective',
+      tags: ['视频', '理解'],
+      description: '包含短视频内容，用于评估模型的视频内容理解和问答能力',
+      dataCount: 80,
+      dictionaryId: 'dict-video-1',
+      createdAt: '2024-03-05',
+      updatedAt: '2024-03-10',
+    },
+    '31': {
+      id: '31',
+      name: '视频动作识别测评集',
+      icon: 'VideoCamera',
+      iconType: 'preset',
+      mediaType: 'video',
+      testType: 'objective',
+      tags: ['视频', '动作'],
+      description: '包含人物动作视频，用于评估模型的动作识别和分类能力',
+      dataCount: 120,
+      dictionaryId: 'dict-video-2',
+      createdAt: '2024-03-06',
+      updatedAt: '2024-03-10',
+    },
   }
 
   dataset.value = mockDatasets[id] || {
@@ -577,6 +824,7 @@ const loadDataset = () => {
     name: '示例测评集',
     icon: 'ChatDotRound',
     iconType: 'preset',
+    mediaType: 'text',
     testType: 'objective',
     tags: ['示例', '测试'],
     description: '这是一个示例测评集的描述信息。',
@@ -586,14 +834,67 @@ const loadDataset = () => {
     updatedAt: '2024-02-01',
   }
 
-  // 模拟测试数据
-  testData.value = Array.from({ length: dataset.value.dataCount }, (_, i) => ({
-    id: `${i + 1}`,
-    input: `测试输入内容 ${i + 1}`,
-    expectedOutput: `期望输出内容 ${i + 1}`,
-    category: ['问候', '询问', '建议', '闲聊'][i % 4],
-    difficulty: ['简单', '中等', '困难'][i % 3],
-  }))
+  // 根据数据字典设置列定义
+  const dictionary = getDictionary(dataset.value.dictionaryId)
+  if (dictionary && dictionary.columns) {
+    columns.value = dictionary.columns.map((col) => ({
+      key: col.key,
+      label: col.label,
+      width: getColWidth(col.type),
+      enumOptions: col.enumOptions,
+    }))
+  } else {
+    // 默认列定义
+    columns.value = [
+      { key: 'id', label: 'ID', width: 80 },
+      { key: 'input', label: '输入', width: 300 },
+      { key: 'expectedOutput', label: '期望输出', width: 300 },
+      { key: 'category', label: '分类', width: 100, enumOptions: ['问候', '询问', '建议', '闲聊', '投诉', '咨询'] },
+      { key: 'difficulty', label: '难度', width: 80, enumOptions: ['简单', '中等', '困难'] },
+    ]
+  }
+
+  // 根据列定义生成测试数据
+  testData.value = generateTestData(dataset.value.dataCount, columns.value)
+}
+
+// 根据列类型获取列宽度
+const getColWidth = (type) => {
+  const widthMap = {
+    string: 200,
+    number: 100,
+    enum: 120,
+    audio: 150,
+    image: 120,
+    video: 150,
+  }
+  return widthMap[type] || 150
+}
+
+// 根据列定义生成测试数据
+const generateTestData = (count, cols) => {
+  const mediaType = dataset.value?.mediaType || 'text'
+  return Array.from({ length: count }, (_, i) => {
+    const row = {}
+    cols.forEach((col) => {
+      if (col.key === 'id') {
+        row[col.key] = `${i + 1}`
+      } else if (col.enumOptions && col.enumOptions.length > 0) {
+        row[col.key] = col.enumOptions[i % col.enumOptions.length]
+      } else if (col.type === 'audio') {
+        row[col.key] = `audio_${i + 1}.mp3`
+      } else if (col.type === 'image') {
+        row[col.key] = `image_${i + 1}.jpg`
+      } else if (col.type === 'video') {
+        row[col.key] = `video_${i + 1}.mp4`
+      } else if (col.type === 'number') {
+        row[col.key] = Math.floor(Math.random() * 100) + 1
+      } else {
+        row[col.key] = `测试${col.label} ${i + 1}`
+      }
+    })
+    return row
+  })
 }
 
 // 分页配置
@@ -1258,6 +1559,20 @@ onMounted(() => {
         </div>
         <div class="info-details">
           <div class="info-row">
+            <span class="info-label">媒体类型：</span>
+            <div class="info-value">
+              <el-tag
+                :style="{ backgroundColor: getMediaTypeColor(dataset.mediaType), borderColor: getMediaTypeColor(dataset.mediaType), color: '#fff' }"
+                size="small"
+              >
+                <el-icon class="tag-icon">
+                  <component :is="getMediaTypeIcon(dataset.mediaType)" />
+                </el-icon>
+                {{ getMediaTypeText(dataset.mediaType) }}
+              </el-tag>
+            </div>
+          </div>
+          <div class="info-row">
             <span class="info-label">测试类型：</span>
             <div class="info-value">
               <el-tag :type="getTestTypeTagType(dataset.testType)" size="small">
@@ -1295,6 +1610,28 @@ onMounted(() => {
           </div>
         </div>
       </div>
+    </el-card>
+
+    <!-- 多媒体文件上传区域 -->
+    <el-card v-if="isMediaType" class="media-upload-card">
+      <template #header>
+        <div class="card-header">
+          <span class="card-title">
+            <el-icon :style="{ color: getMediaTypeColor(dataset.mediaType) }">
+              <component :is="getMediaTypeIcon(dataset.mediaType)" />
+            </el-icon>
+            {{ getMediaTypeText(dataset.mediaType) }}文件上传
+          </span>
+          <span class="card-tip">支持拖拽上传，批量上传</span>
+        </div>
+      </template>
+      <MediaFileUpload
+        ref="mediaUploadRef"
+        :media-type="dataset.mediaType"
+        :max-size="dataset.mediaType === 'video' ? 100 : dataset.mediaType === 'audio' ? 20 : 5"
+        @upload="handleFileUpload"
+        @remove="handleFileRemove"
+      />
     </el-card>
 
     <!-- 测试数据 Excel 表格 -->
@@ -1828,6 +2165,21 @@ onMounted(() => {
 <style scoped>
 .dataset-detail-page {
   padding: 24px;
+}
+
+/* 媒体类型标签样式 */
+.tag-icon {
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+/* 多媒体上传区域样式 */
+.media-upload-card {
+  margin-bottom: 24px;
+}
+
+.media-upload-card :deep(.el-card__body) {
+  padding: 0;
 }
 
 .page-header {
