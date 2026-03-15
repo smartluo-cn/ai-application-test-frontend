@@ -1593,16 +1593,7 @@ onUnmounted(() => {
             </div>
           </template>
 
-          <!-- 条件节点配置 -->
-          <template v-if="selectedNode.type === 'condition'">
-            <div class="config-item">
-              <label>条件表达式</label>
-              <el-input
-                v-model="selectedNode.config.expression"
-                placeholder="输入条件表达式"
-              />
-            </div>
-          </template>
+
         </div>
       </div>
     </div>
