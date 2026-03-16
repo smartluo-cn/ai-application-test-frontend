@@ -237,16 +237,19 @@ const getConnectionPath = (connection) => {
   if (!sourceNode || !targetNode) return ''
 
   // 节点尺寸
-  const nodeWidth = 200
-  const nodeHeight = 72 // padding 16*2 + min-height 40 = 72
+  const nodeWidth = 220
 
-  // 起点在源节点右侧中间
+  // 获取参数索引，如果没有则使用0（兼容旧数据）
+  const sourceParamIndex = connection.sourceParamIndex ?? 0
+  const targetParamIndex = connection.targetParamIndex ?? 0
+
+  // 计算起点：输出参数端口位置
+  const y1 = getNodeParamPortPosition(sourceNode, sourceParamIndex, 'output')
   const x1 = sourceNode.x + nodeWidth
-  const y1 = sourceNode.y + nodeHeight / 2
 
-  // 终点在目标节点左侧中间
+  // 计算终点：输入参数端口位置
+  const y2 = getNodeParamPortPosition(targetNode, targetParamIndex, 'input')
   const x2 = targetNode.x
-  const y2 = targetNode.y + nodeHeight / 2
 
   // 贝塞尔曲线控制点
   const distance = Math.abs(x2 - x1)
@@ -262,13 +265,17 @@ const getConnectionMidpoint = (connection) => {
 
   if (!sourceNode || !targetNode) return null
 
-  const nodeWidth = 200
-  const nodeHeight = 72
+  const nodeWidth = 220
 
+  // 计算起点：输出参数端口位置
+  const sourceParamIndex = connection.sourceParamIndex ?? 0
+  const y1 = getNodeParamPortPosition(sourceNode, sourceParamIndex, 'output')
   const x1 = sourceNode.x + nodeWidth
-  const y1 = sourceNode.y + nodeHeight / 2
-  const x2 = targetNode.x
-  const y2 = targetNode.y + nodeHeight / 2
+
+  // 计算终点：输入参数端口位置
+  const targetParamIndex = connection.targetParamIndex ?? 0
+  const y2 = targetNode.x
+  const x2 = getNodeParamPortPosition(targetNode, targetParamIndex, 'input')
 
   // 贝塞尔曲线在 t=0.5 时的点
   const distance = Math.abs(x2 - x1)
@@ -1504,13 +1511,13 @@ const stopConnection = (event) => {
 }
 
 // 在输入端口结束连线
-const endConnection = (targetNode, targetPort, event) => {
+const endConnection = (targetNode, targetParam, paramIndex, event) => {
   document.removeEventListener('mousemove', onDrawingConnection)
   document.removeEventListener('mouseup', stopConnection)
 
   if (!drawingConnection.value) return
 
-  const { sourceNode, sourcePort } = drawingConnection.value
+  const { sourceNode, sourceParam, sourceParamIndex } = drawingConnection.value
 
   // 不能连接到自己
   if (sourceNode.id === targetNode.id) {
@@ -1522,9 +1529,9 @@ const endConnection = (targetNode, targetPort, event) => {
   const existingConnection = connections.value.find(
     (c) =>
       c.sourceId === sourceNode.id &&
-      c.sourcePort === sourcePort.id &&
+      c.sourceParamIndex === sourceParamIndex &&
       c.targetId === targetNode.id &&
-      c.targetPort === targetPort.id
+      c.targetParamIndex === paramIndex
   )
 
   if (existingConnection) {
@@ -1536,13 +1543,62 @@ const endConnection = (targetNode, targetPort, event) => {
   const newConnection = {
     id: `conn-${Date.now()}`,
     sourceId: sourceNode.id,
-    sourcePort: sourcePort.id,
+    sourceParamIndex: sourceParamIndex,
     targetId: targetNode.id,
-    targetPort: targetPort.id,
+    targetParamIndex: paramIndex,
   }
 
   connections.value.push(newConnection)
   drawingConnection.value = null
+}
+
+// 从输出端口开始连线
+const startConnectionFromOutput = (node, param, paramIndex, event) => {
+  event.stopPropagation()
+
+  // 计算输出端口位置
+  const nodeWidth = 220
+  const y = getNodeParamPortPosition(node, paramIndex, 'output')
+
+  const x = node.x + nodeWidth
+
+  drawingConnection.value = {
+    sourceNode: node,
+    sourceParam: param,
+    sourceParamIndex: paramIndex,
+    startX: x,
+    startY: y,
+    endX: x,
+    endY: y,
+  }
+
+  document.addEventListener('mousemove', onDrawingConnection)
+  document.addEventListener('mouseup', stopConnection)
+}
+
+// 计算节点参数端口位置
+const getNodeParamPortPosition = (node, paramIndex, type) => {
+  // 基础高度：节点头部
+  const headerHeight = 44
+  // 参数区域起始Y坐标
+  let startY = node.y + headerHeight
+
+  // 如果有输入参数且当前是输出参数，需要加上输入参数区域高度
+  const inputParams = getNodeInputParams(node)
+  const outputParams = getNodeOutputParams(node)
+
+  if (type === 'output' && inputParams.length > 0) {
+    // 输入参数标签高度 + 表格高度
+    startY += 24 + inputParams.length * 24 + 12
+  }
+
+  // 当前参数区域的表格行高度
+  const rowHeight = 24
+  // 参数标签高度
+  startY += 24
+
+  // 计算具体参数行的Y坐标（端口在行的中间）
+  return startY + paramIndex * rowHeight + rowHeight / 2
 }
 
 // 键盘事件处理
@@ -1716,62 +1772,61 @@ onUnmounted(() => {
                 <span class="node-name">{{ node.name }}</span>
               </div>
 
-              <!-- 输入参数显示 -->
+              <!-- 输入参数表格 -->
               <div
                 v-if="getNodeInputParams(node).length > 0"
                 class="node-params input-params"
               >
                 <div class="params-label">输入</div>
-                <div class="params-list">
-                  <div
-                    v-for="(param, idx) in getNodeInputParams(node)"
-                    :key="'in-' + idx"
-                    class="param-item"
-                  >
-                    <span class="param-name">{{ param.name }}</span>
-                    <span class="param-type">{{ param.type }}</span>
-                  </div>
-                </div>
+                <table class="params-table">
+                  <tbody>
+                    <tr
+                      v-for="(param, idx) in getNodeInputParams(node)"
+                      :key="'in-' + idx"
+                      class="param-row"
+                    >
+                      <td class="param-name-cell">{{ param.name }}</td>
+                      <td class="param-type-cell">{{ param.type }}</td>
+                      <!-- 输入端口 -->
+                      <td class="param-port-cell">
+                        <div
+                          class="input-port"
+                          :title="param.name"
+                          @mouseup.stop="endConnection(node, param, idx, $event)"
+                        ></div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
 
-              <!-- 输出参数显示 -->
+              <!-- 输出参数表格 -->
               <div
                 v-if="getNodeOutputParams(node).length > 0"
                 class="node-params output-params"
               >
                 <div class="params-label">输出</div>
-                <div class="params-list">
-                  <div
-                    v-for="(param, idx) in getNodeOutputParams(node)"
-                    :key="'out-' + idx"
-                    class="param-item"
-                  >
-                    <span class="param-name">{{ param.name }}</span>
-                    <span class="param-type">{{ param.type }}</span>
-                  </div>
-                </div>
+                <table class="params-table">
+                  <tbody>
+                    <tr
+                      v-for="(param, idx) in getNodeOutputParams(node)"
+                      :key="'out-' + idx"
+                      class="param-row"
+                    >
+                      <!-- 输出端口 -->
+                      <td class="param-port-cell output-port-cell">
+                        <div
+                          class="output-port"
+                          :title="param.name"
+                          @mousedown.stop="startConnectionFromOutput(node, param, idx, $event)"
+                        ></div>
+                      </td>
+                      <td class="param-name-cell">{{ param.name }}</td>
+                      <td class="param-type-cell">{{ param.type }}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-
-              <!-- 输入端口 -->
-              <div v-if="node.inputs.length > 0" class="node-inputs">
-                <div
-                  v-for="input in node.inputs"
-                  :key="input.id"
-                  class="input-port"
-                  :title="input.name"
-                  @mouseup="endConnection(node, input, $event)"
-                ></div>
-              </div>
-            </div>
-
-            <!-- 合并的连线/添加按钮 -->
-            <div
-              v-if="node.outputs.length > 0"
-              class="node-action-btn"
-              @mousedown="handleActionBtnDown(node, $event)"
-              @mouseup="handleActionBtnUp(node, $event)"
-            >
-              <el-icon :size="12"><Plus /></el-icon>
             </div>
           </div>
         </div>
@@ -2525,7 +2580,7 @@ onUnmounted(() => {
   color: #1f2937;
 }
 
-/* 节点参数显示样式 */
+/* 节点参数显示样式 - 表格形式 */
 .node-params {
   margin-top: 12px;
   padding-top: 10px;
@@ -2541,35 +2596,45 @@ onUnmounted(() => {
   margin-bottom: 6px;
 }
 
-.node-params .params-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.node-params .param-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.node-params .params-table {
+  width: 100%;
+  border-collapse: collapse;
   font-size: 11px;
-  line-height: 1.4;
 }
 
-.node-params .param-name {
+.node-params .params-table tbody tr {
+  height: 24px;
+}
+
+.node-params .params-table td {
+  padding: 4px 8px;
+  vertical-align: middle;
+  border: none;
+}
+
+.node-params .param-name-cell {
   color: #374151;
   font-weight: 500;
-  max-width: 100px;
+  max-width: 80px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.node-params .param-type {
+.node-params .param-type-cell {
   color: #6b7280;
   font-size: 10px;
   background: #f3f4f6;
-  padding: 1px 6px;
-  border-radius: 3px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-align: center;
+  min-width: 50px;
+}
+
+.node-params .param-port-cell {
+  width: 12px;
+  padding: 0;
+  position: relative;
 }
 
 /* 输入参数样式 */
@@ -2577,7 +2642,7 @@ onUnmounted(() => {
   color: #6366f1;
 }
 
-.node-params.input-params .param-type {
+.node-params.input-params .param-type-cell {
   background: #eef2ff;
   color: #6366f1;
 }
@@ -2587,9 +2652,56 @@ onUnmounted(() => {
   color: #10b981;
 }
 
-.node-params.output-params .param-type {
+.node-params.output-params .param-type-cell {
   background: #ecfdf5;
   color: #10b981;
+}
+
+/* 输入端口样式 */
+.input-port {
+  position: absolute;
+  left: -6px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #6366f1;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.3);
+  cursor: crosshair;
+  transition: all 0.2s;
+  z-index: 5;
+}
+
+.input-port:hover {
+  background: #22d3ee;
+  transform: scale(1.2);
+  box-shadow: 0 0 6px rgba(99, 102, 241, 0.5);
+}
+
+/* 输出端口样式 */
+.output-port {
+  position: absolute;
+  right: -6px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #10b981;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.3);
+  cursor: crosshair;
+  transition: all 0.2s;
+  z-index: 5;
+}
+
+.output-port:hover {
+  background: #22d3ee;
+  transform: scale(1.2);
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+}
+
+.output-port-cell {
+  position: relative;
+  width: 12px;
 }
 
 .config-panel {
@@ -2946,18 +3058,12 @@ onUnmounted(() => {
   transform: translateY(-50%) scale(0.95);
 }
 
-/* 输入端口 */
-.node-inputs {
+/* 输入端口 - 節点内的表格行中 */
+.input-port {
   position: absolute;
   left: -6px;
   top: 50%;
   transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.input-port {
   width: 12px;
   height: 12px;
   border-radius: 50%;
