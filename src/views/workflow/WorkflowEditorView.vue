@@ -2001,6 +2001,28 @@ onUnmounted(() => {
               </el-radio-group>
             </div>
 
+            <!-- 输入参数定义 -->
+            <div class="config-item">
+              <div class="config-item-header">
+                <label>输入参数</label>
+              </div>
+              <div class="input-params-definition">
+                <div class="param-item">
+                  <span class="param-name">input</span>
+                  <span v-if="selectedNode.config.inputType === 'text'" class="param-type">
+                    String
+                  </span>
+                  <span v-else class="param-type">Dataset</span>
+                </div>
+                <div v-if="selectedNode.config.inputType === 'text'" class="param-desc">
+                  需要清洗的文本内容
+                </div>
+                <div v-else class="param-desc">
+                  需要清洗的测评集数据
+                </div>
+              </div>
+            </div>
+
             <!-- 直接输入文本 -->
             <div v-if="selectedNode.config.inputType === 'text'" class="config-item">
               <label>输入文本</label>
@@ -3153,6 +3175,14 @@ onUnmounted(() => {
 
 .config-item-header label {
   margin-bottom: 0;
+}
+
+/* 输入参数定义样式 */
+.input-params-definition {
+  padding: 12px 16px;
+  background: #faf5ff;
+  border-radius: 8px;
+  border: 1px solid #e9d5ff;
 }
 
 /* 输出参数定义样式 */
