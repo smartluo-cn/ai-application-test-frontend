@@ -48,7 +48,7 @@ const router = useRouter()
 // 工作流信息
 const workflow = reactive({
   id: route.params.id || 'new',
-  name: route.params.id === 'new' ? '未命名工作流' : '智能问答工作流',
+  name: route.query.projectName || (route.params.id === 'new' ? '未命名工作流' : '智能问答工作流'),
   description: '',
   published: false,
   hasRun: false, // 是否已成功运行过
@@ -142,6 +142,7 @@ const nodes = ref([
     y: 300,
     inputs: [],
     outputs: [{ id: 'out-1', name: '输出' }],
+    outputParams: [{ name: 'input', type: 'String' }],
     inputParams: [],
     config: {},
   },
@@ -149,7 +150,7 @@ const nodes = ref([
     id: 'end-1',
     type: 'end',
     name: '结束',
-    x: 400,
+    x: 450,
     y: 300,
     inputs: [{ id: 'in-1', name: '输入' }],
     outputs: [],
@@ -159,7 +160,7 @@ const nodes = ref([
 
 // 连线列表
 const connections = ref([
-  { id: 'conn-1', sourceId: 'start-1', sourcePort: 'out-1', targetId: 'end-1', targetPort: 'in-1' },
+  { id: 'conn-1', sourceId: 'start-1', sourcePort: 'out-1', targetId: 'end-1', targetPort: 'in-1', sourceParamIndex: 0, targetParamIndex: 0 },
 ])
 
 // 选中的节点
@@ -229,6 +230,26 @@ const canvasDragState = reactive({
   startOffsetY: 0,
 })
 
+// 获取端口的实际 DOM 位置
+const getPortDomPosition = (nodeId, paramIndex, type) => {
+  const nodeElement = document.querySelector(`[data-node-id="${nodeId}"]`)
+  if (!nodeElement) return null
+
+  const portSelector = type === 'output' ? '.output-port' : '.input-port'
+  const ports = nodeElement.querySelectorAll(portSelector)
+  const portElement = ports[paramIndex]
+  if (!portElement) return null
+
+  const portRect = portElement.getBoundingClientRect()
+  const canvasRect = document.querySelector('.canvas')?.getBoundingClientRect()
+  if (!canvasRect) return null
+
+  return {
+    x: portRect.left + portRect.width / 2 - canvasRect.left,
+    y: portRect.top + portRect.height / 2 - canvasRect.top,
+  }
+}
+
 // 计算连线路径
 const getConnectionPath = (connection) => {
   const sourceNode = nodes.value.find((n) => n.id === connection.sourceId)
@@ -236,20 +257,29 @@ const getConnectionPath = (connection) => {
 
   if (!sourceNode || !targetNode) return ''
 
-  // 节点尺寸
-  const nodeWidth = 220
-
   // 获取参数索引，如果没有则使用0（兼容旧数据）
   const sourceParamIndex = connection.sourceParamIndex ?? 0
   const targetParamIndex = connection.targetParamIndex ?? 0
 
-  // 计算起点：输出参数端口位置
-  const y1 = getNodeParamPortPosition(sourceNode, sourceParamIndex, 'output')
-  const x1 = sourceNode.x + nodeWidth
+  // 尝试使用 DOM 获取端口实际位置
+  const sourcePortPos = getPortDomPosition(sourceNode.id, sourceParamIndex, 'output')
+  const targetPortPos = getPortDomPosition(targetNode.id, targetParamIndex, 'input')
 
-  // 计算终点：输入参数端口位置
-  const y2 = getNodeParamPortPosition(targetNode, targetParamIndex, 'input')
-  const x2 = targetNode.x
+  let x1, y1, x2, y2
+
+  if (sourcePortPos && targetPortPos) {
+    x1 = sourcePortPos.x
+    y1 = sourcePortPos.y
+    x2 = targetPortPos.x
+    y2 = targetPortPos.y
+  } else {
+    // 回退到计算位置
+    const nodeWidth = 220
+    y1 = getNodeParamPortPosition(sourceNode, sourceParamIndex, 'output')
+    x1 = sourceNode.x + nodeWidth
+    y2 = getNodeParamPortPosition(targetNode, targetParamIndex, 'input')
+    x2 = targetNode.x
+  }
 
   // 贝塞尔曲线控制点
   const distance = Math.abs(x2 - x1)
@@ -265,17 +295,29 @@ const getConnectionMidpoint = (connection) => {
 
   if (!sourceNode || !targetNode) return null
 
-  const nodeWidth = 220
-
-  // 计算起点：输出参数端口位置
+  // 获取参数索引
   const sourceParamIndex = connection.sourceParamIndex ?? 0
-  const y1 = getNodeParamPortPosition(sourceNode, sourceParamIndex, 'output')
-  const x1 = sourceNode.x + nodeWidth
-
-  // 计算终点：输入参数端口位置
   const targetParamIndex = connection.targetParamIndex ?? 0
-  const y2 = targetNode.x
-  const x2 = getNodeParamPortPosition(targetNode, targetParamIndex, 'input')
+
+  // 尝试使用 DOM 获取端口实际位置
+  const sourcePortPos = getPortDomPosition(sourceNode.id, sourceParamIndex, 'output')
+  const targetPortPos = getPortDomPosition(targetNode.id, targetParamIndex, 'input')
+
+  let x1, y1, x2, y2
+
+  if (sourcePortPos && targetPortPos) {
+    x1 = sourcePortPos.x
+    y1 = sourcePortPos.y
+    x2 = targetPortPos.x
+    y2 = targetPortPos.y
+  } else {
+    // 回退到计算位置
+    const nodeWidth = 220
+    y1 = getNodeParamPortPosition(sourceNode, sourceParamIndex, 'output')
+    x1 = sourceNode.x + nodeWidth
+    y2 = getNodeParamPortPosition(targetNode, targetParamIndex, 'input')
+    x2 = targetNode.x
+  }
 
   // 贝塞尔曲线在 t=0.5 时的点
   const distance = Math.abs(x2 - x1)
@@ -305,6 +347,104 @@ const tempConnectionPath = computed(() => {
 
   return `M ${startX} ${startY} C ${startX + controlOffset} ${startY}, ${endX - controlOffset} ${endY}, ${endX} ${endY}`
 })
+
+// 计算连线路径的一部分（用于分层渲染）
+// part: 'start' 返回前半部分（在节点下层），'end' 返回后半部分（在节点上层）
+const getConnectionPathPart = (connection, part) => {
+  const sourceNode = nodes.value.find((n) => n.id === connection.sourceId)
+  const targetNode = nodes.value.find((n) => n.id === connection.targetId)
+
+  if (!sourceNode || !targetNode) return ''
+
+  // 获取参数索引
+  const sourceParamIndex = connection.sourceParamIndex ?? 0
+  const targetParamIndex = connection.targetParamIndex ?? 0
+
+  // 尝试使用 DOM 获取端口实际位置
+  const sourcePortPos = getPortDomPosition(sourceNode.id, sourceParamIndex, 'output')
+  const targetPortPos = getPortDomPosition(targetNode.id, targetParamIndex, 'input')
+
+  let x1, y1, x2, y2
+
+  if (sourcePortPos && targetPortPos) {
+    x1 = sourcePortPos.x
+    y1 = sourcePortPos.y
+    x2 = targetPortPos.x
+    y2 = targetPortPos.y
+  } else {
+    // 回退到计算位置
+    const nodeWidth = 220
+    y1 = getNodeParamPortPosition(sourceNode, sourceParamIndex, 'output')
+    x1 = sourceNode.x + nodeWidth
+    y2 = getNodeParamPortPosition(targetNode, targetParamIndex, 'input')
+    x2 = targetNode.x
+  }
+
+  // 贝塞尔曲线控制点
+  const distance = Math.abs(x2 - x1)
+  const controlOffset = Math.max(40, Math.min(distance * 0.4, 120))
+
+  // 计算中点位置（t=0.5）
+  const cx1 = x1 + controlOffset
+  const cy1 = y1
+  const cx2 = x2 - controlOffset
+  const cy2 = y2
+
+  // 三次贝塞尔曲线在 t=0.5 时的点
+  const t = 0.5
+  const mt = 1 - t
+  const midX = mt * mt * mt * x1 + 3 * mt * mt * t * cx1 + 3 * mt * t * t * cx2 + t * t * t * x2
+  const midY = mt * mt * mt * y1 + 3 * mt * mt * t * cy1 + 3 * mt * t * t * cy2 + t * t * t * y2
+
+  // 计算中点处的导数方向，用于平滑连接
+  const dx = 3 * mt * mt * (cx1 - x1) + 6 * mt * t * (cx2 - cx1) + 3 * t * t * (x2 - cx2)
+  const dy = 3 * mt * mt * (cy1 - y1) + 6 * mt * t * (cy2 - cy1) + 3 * t * t * (y2 - cy2)
+  const len = Math.sqrt(dx * dx + dy * dy)
+  const normDx = len > 0 ? dx / len * 5 : 0
+  const normDy = len > 0 ? dy / len * 5 : 0
+
+  if (part === 'start') {
+    // 前半部分：从起点到中点（略微超出中点以避免间隙）
+    return `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${midX + normDx} ${midY + normDy}`
+  } else {
+    // 后半部分：从中点到终点（略微提前起点以避免间隙）
+    return `M ${midX - normDx} ${midY - normDy} C ${cx2} ${cy2}, ${x2 - controlOffset} ${y2}, ${x2} ${y2}`
+  }
+}
+
+// 计算临时连线路径的一部分
+const getTempConnectionPathPart = (part) => {
+  if (!drawingConnection.value) return ''
+  const { startX, startY, endX, endY } = drawingConnection.value
+
+  const distance = Math.abs(endX - startX)
+  const controlOffset = Math.max(40, Math.min(distance * 0.4, 120))
+
+  // 贝塞尔曲线控制点
+  const cx1 = startX + controlOffset
+  const cy1 = startY
+  const cx2 = endX - controlOffset
+  const cy2 = endY
+
+  // 三次贝塞尔曲线在 t=0.5 时的点
+  const t = 0.5
+  const mt = 1 - t
+  const midX = mt * mt * mt * startX + 3 * mt * mt * t * cx1 + 3 * mt * t * t * cx2 + t * t * t * endX
+  const midY = mt * mt * mt * startY + 3 * mt * mt * t * cy1 + 3 * mt * t * t * cy2 + t * t * t * endY
+
+  // 计算中点处的导数方向
+  const dx = 3 * mt * mt * (cx1 - startX) + 6 * mt * t * (cx2 - cx1) + 3 * t * t * (endX - cx2)
+  const dy = 3 * mt * mt * (cy1 - startY) + 6 * mt * t * (cy2 - cy1) + 3 * t * t * (endY - cy2)
+  const len = Math.sqrt(dx * dx + dy * dy)
+  const normDx = len > 0 ? dx / len * 5 : 0
+  const normDy = len > 0 ? dy / len * 5 : 0
+
+  if (part === 'start') {
+    return `M ${startX} ${startY} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${midX + normDx} ${midY + normDy}`
+  } else {
+    return `M ${midX - normDx} ${midY - normDy} C ${cx2} ${cy2}, ${endX - controlOffset} ${endY}, ${endX} ${endY}`
+  }
+}
 
 // 获取节点类型配置
 const getNodeTypeConfig = (type) => {
@@ -840,6 +980,25 @@ const removeInputParam = (index) => {
   selectedNode.value.inputParams.splice(index, 1)
 }
 
+// 添加输出参数（用于开始节点）
+const addOutputParam = () => {
+  if (!selectedNode.value) return
+  if (!selectedNode.value.outputParams) {
+    selectedNode.value.outputParams = []
+  }
+  selectedNode.value.outputParams.push({
+    name: '',
+    type: 'string',
+    required: false,
+  })
+}
+
+// 删除输出参数（用于开始节点）
+const removeOutputParam = (index) => {
+  if (!selectedNode.value || !selectedNode.value.outputParams) return
+  selectedNode.value.outputParams.splice(index, 1)
+}
+
 // 获取可用的变量列表（从开始节点的输入参数获取）
 const getAvailableVariables = () => {
   const startNode = nodes.value.find((n) => n.type === 'start')
@@ -854,9 +1013,13 @@ const getAvailableVariables = () => {
 const getNodeInputParams = (node) => {
   if (!node) return []
 
-  // 开始节点：从 inputParams 获取
+  // 开始节点：输入参数与输出参数相同
   if (node.type === 'start') {
-    return (node.inputParams || []).map((param) => ({
+    const outputParams = node.outputParams || []
+    if (outputParams.length === 0) {
+      return [{ name: '-', type: '-', isPlaceholder: true }]
+    }
+    return outputParams.map((param) => ({
       name: param.name || 'input',
       type: param.type || 'String',
     }))
@@ -899,17 +1062,26 @@ const getNodeInputParams = (node) => {
 const getNodeOutputParams = (node) => {
   if (!node) return []
 
-  // 开始节点：输出所有输入参数
+  // 开始节点：从 outputParams 配置读取
   if (node.type === 'start') {
-    return (node.inputParams || []).map((param) => ({
+    const outputParams = node.outputParams || []
+    if (outputParams.length === 0) {
+      // 没有定义输出参数时，显示占位符
+      return [{ name: '-', type: '-', isPlaceholder: true }]
+    }
+    return outputParams.map((param) => ({
       name: param.name || 'output',
       type: param.type || 'String',
     }))
   }
 
-  // 结束节点：没有输出
+  // 结束节点：输出参数与输入参数相同
   if (node.type === 'end') {
-    return []
+    const inputParams = getNodeInputParams(node)
+    if (inputParams.length === 0) {
+      return [{ name: '-', type: '-', isPlaceholder: true }]
+    }
+    return inputParams
   }
 
   // 文本清洗节点：根据输入类型确定输出
@@ -977,8 +1149,8 @@ const getNodeOutputParams = (node) => {
     return [{ name: 'reportUrl', type: 'String' }]
   }
 
-  // 默认输出参数
-  return [{ name: 'output', type: 'Any' }]
+  // 默认情况下显示占位输出参数
+  return [{ name: '-', type: '-', isPlaceholder: true }]
 }
 
 // 初始化条件判断节点配置
@@ -1556,20 +1728,40 @@ const endConnection = (targetNode, targetParam, paramIndex, event) => {
 const startConnectionFromOutput = (node, param, paramIndex, event) => {
   event.stopPropagation()
 
-  // 计算输出端口位置
-  const nodeWidth = 220
-  const y = getNodeParamPortPosition(node, paramIndex, 'output')
+  // 使用端口的实际 DOM 位置
+  const portElement = event.target
+  const portRect = portElement.getBoundingClientRect()
+  const canvasRect = document.querySelector('.canvas')?.getBoundingClientRect()
 
-  const x = node.x + nodeWidth
+  if (!canvasRect) {
+    // 回退到计算位置
+    const nodeWidth = 220
+    const y = getNodeParamPortPosition(node, paramIndex, 'output')
+    const x = node.x + nodeWidth
 
-  drawingConnection.value = {
-    sourceNode: node,
-    sourceParam: param,
-    sourceParamIndex: paramIndex,
-    startX: x,
-    startY: y,
-    endX: x,
-    endY: y,
+    drawingConnection.value = {
+      sourceNode: node,
+      sourceParam: param,
+      sourceParamIndex: paramIndex,
+      startX: x,
+      startY: y,
+      endX: x,
+      endY: y,
+    }
+  } else {
+    // 计算端口中心相对于画布的坐标
+    const x = portRect.left + portRect.width / 2 - canvasRect.left
+    const y = portRect.top + portRect.height / 2 - canvasRect.top
+
+    drawingConnection.value = {
+      sourceNode: node,
+      sourceParam: param,
+      sourceParamIndex: paramIndex,
+      startX: x,
+      startY: y,
+      endX: x,
+      endY: y,
+    }
   }
 
   document.addEventListener('mousemove', onDrawingConnection)
@@ -1578,8 +1770,8 @@ const startConnectionFromOutput = (node, param, paramIndex, event) => {
 
 // 计算节点参数端口位置
 const getNodeParamPortPosition = (node, paramIndex, type) => {
-  // 基础高度：节点头部
-  const headerHeight = 44
+  // 基础高度：节点头部 + node-content padding-top
+  const headerHeight = 56  // 包含 node-content padding-top: 12px
   // 参数区域起始Y坐标
   let startY = node.y + headerHeight
 
@@ -1588,14 +1780,15 @@ const getNodeParamPortPosition = (node, paramIndex, type) => {
   const outputParams = getNodeOutputParams(node)
 
   if (type === 'output' && inputParams.length > 0) {
-    // 输入参数标签高度 + 表格高度
-    startY += 24 + inputParams.length * 24 + 12
+    // 输入参数区域高度：margin-top(12) + padding-top(10) + 标签(18) + margin-bottom(6) + 表格行(inputParams.length * 32)
+    startY += 12 + 10 + 18 + 6 + inputParams.length * 32
   }
 
-  // 当前参数区域的表格行高度
-  const rowHeight = 24
-  // 参数标签高度
-  startY += 24
+  // 当前参数区域的起始高度：margin-top(12) + padding-top(10) + 标签(18) + margin-bottom(6)
+  startY += 12 + 10 + 18 + 6
+
+  // 表格行高度（包含 padding）
+  const rowHeight = 32
 
   // 计算具体参数行的Y坐标（端口在行的中间）
   return startY + paramIndex * rowHeight + rowHeight / 2
@@ -1615,8 +1808,15 @@ const handleKeydown = (event) => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('keydown', handleKeydown)
+  // 等待 DOM 准备好后触发连线重新计算
+  await nextTick()
+  // 通过微调 connections 数组来触发重新渲染
+  if (connections.value.length > 0) {
+    const temp = [...connections.value]
+    connections.value = temp
+  }
 })
 
 onUnmounted(() => {
@@ -1629,6 +1829,10 @@ onUnmounted(() => {
     <!-- 悬浮工具栏 -->
     <div class="floating-toolbar">
       <el-button text :icon="ArrowLeft" @click="goBack" title="返回">返回</el-button>
+      <div class="toolbar-divider"></div>
+      <div class="workflow-name-display">
+        <span class="workflow-name-text">{{ workflow.name }}</span>
+      </div>
       <div class="toolbar-divider"></div>
       <div class="zoom-controls">
         <el-button text :icon="ZoomOut" @click="zoomOut" title="缩小" />
@@ -1661,8 +1865,8 @@ onUnmounted(() => {
             transformOrigin: '0 0',
           }"
         >
-          <!-- 连线层 -->
-          <svg class="connections-layer" :width="canvas.width" :height="canvas.height">
+          <!-- 连线层（起点部分 - 在节点下层） -->
+          <svg class="connections-layer connections-layer-bottom" :width="canvas.width" :height="canvas.height">
             <!-- 箭头标记定义 -->
             <defs>
               <marker
@@ -1701,27 +1905,25 @@ onUnmounted(() => {
                 <stop offset="100%" style="stop-color: #8b5cf6; stop-opacity: 1" />
               </linearGradient>
             </defs>
-            <!-- 已有连线 -->
+            <!-- 已有连线（起点部分） -->
             <path
               v-for="conn in connections"
-              :key="conn.id"
-              :d="getConnectionPath(conn)"
+              :key="conn.id + '-start'"
+              :d="getConnectionPathPart(conn, 'start')"
               class="connection-path"
               :class="{
                 selected: selectedConnection?.id === conn.id,
                 hovered: hoveredConnection?.id === conn.id
               }"
-              :marker-end="selectedConnection?.id === conn.id || hoveredConnection?.id === conn.id ? 'url(#arrowhead-selected)' : 'url(#arrowhead)'"
               @click.stop="selectConnection(conn, $event)"
               @mouseenter="handleConnectionMouseEnter(conn)"
               @mouseleave="handleConnectionMouseLeave"
             />
-            <!-- 临时连线 -->
+            <!-- 临时连线（起点部分） -->
             <path
               v-if="tempConnectionPath"
-              :d="tempConnectionPath"
+              :d="getTempConnectionPathPart('start')"
               class="connection-path temp"
-              marker-end="url(#arrowhead-temp)"
             />
           </svg>
 
@@ -1748,6 +1950,7 @@ onUnmounted(() => {
           <div
             v-for="node in nodes"
             :key="node.id"
+            :data-node-id="node.id"
             class="flow-node"
             :class="{ selected: selectedNode?.id === node.id }"
             :style="{ left: `${node.x}px`, top: `${node.y}px` }"
@@ -1785,16 +1988,16 @@ onUnmounted(() => {
                       :key="'in-' + idx"
                       class="param-row"
                     >
-                      <td class="param-name-cell">{{ param.name }}</td>
-                      <td class="param-type-cell">{{ param.type }}</td>
-                      <!-- 输入端口 -->
-                      <td class="param-port-cell">
+                      <!-- 输入端口在左边 -->
+                      <td class="param-port-cell input-port-cell">
                         <div
                           class="input-port"
                           :title="param.name"
                           @mouseup.stop="endConnection(node, param, idx, $event)"
                         ></div>
                       </td>
+                      <td class="param-name-cell">{{ param.name }}</td>
+                      <td class="param-type-cell">{{ param.type }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -1813,6 +2016,8 @@ onUnmounted(() => {
                       :key="'out-' + idx"
                       class="param-row"
                     >
+                      <td class="param-name-cell">{{ param.name }}</td>
+                      <td class="param-type-cell">{{ param.type }}</td>
                       <!-- 输出端口 -->
                       <td class="param-port-cell output-port-cell">
                         <div
@@ -1821,14 +2026,48 @@ onUnmounted(() => {
                           @mousedown.stop="startConnectionFromOutput(node, param, idx, $event)"
                         ></div>
                       </td>
-                      <td class="param-name-cell">{{ param.name }}</td>
-                      <td class="param-type-cell">{{ param.type }}</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
             </div>
           </div>
+
+          <!-- 连线层（终点部分 - 在节点上层） -->
+          <svg class="connections-layer connections-layer-top" :width="canvas.width" :height="canvas.height">
+            <!-- 已有连线（终点部分） -->
+            <path
+              v-for="conn in connections"
+              :key="conn.id + '-end'"
+              :d="getConnectionPathPart(conn, 'end')"
+              class="connection-path"
+              :class="{
+                selected: selectedConnection?.id === conn.id,
+                hovered: hoveredConnection?.id === conn.id
+              }"
+              :style="{ pointerEvents: 'none' }"
+            />
+            <!-- 临时连线（终点部分） -->
+            <path
+              v-if="tempConnectionPath"
+              :d="getTempConnectionPathPart('end')"
+              class="connection-path temp"
+              :style="{ pointerEvents: 'none' }"
+            />
+            <!-- 连线箭头（在终点显示） -->
+            <path
+              v-for="conn in connections"
+              :key="'arrow-' + conn.id"
+              :d="getConnectionPathPart(conn, 'end')"
+              class="connection-path-arrow"
+              :class="{
+                selected: selectedConnection?.id === conn.id,
+                hovered: hoveredConnection?.id === conn.id
+              }"
+              marker-end="url(#arrowhead)"
+              :style="{ pointerEvents: 'none' }"
+            />
+          </svg>
         </div>
 
         <!-- 添加节点弹窗 -->
@@ -2001,20 +2240,20 @@ onUnmounted(() => {
           </div>
         </div>
         <div class="panel-content">
-          <!-- 开始节点 - 输入参数配置 -->
+          <!-- 开始节点 - 输出参数配置 -->
           <template v-if="selectedNode.type === 'start'">
             <div class="config-item">
               <div class="config-item-header">
-                <label>输入参数</label>
-                <el-button type="primary" text size="small" :icon="Plus" @click="addInputParam">
+                <label>输出参数</label>
+                <el-button type="primary" text size="small" :icon="Plus" @click="addOutputParam">
                   添加参数
                 </el-button>
               </div>
               <el-table
-                :data="selectedNode.inputParams"
+                :data="selectedNode.outputParams"
                 border
                 size="small"
-                empty-text="暂无输入参数"
+                empty-text="暂无输出参数"
                 style="width: 100%"
               >
                 <el-table-column label="变量名" min-width="120">
@@ -2045,7 +2284,7 @@ onUnmounted(() => {
                       text
                       size="small"
                       :icon="Delete"
-                      @click="removeInputParam($index)"
+                      @click="removeOutputParam($index)"
                     />
                   </template>
                 </el-table-column>
@@ -2440,6 +2679,22 @@ onUnmounted(() => {
   margin: 0 4px;
 }
 
+.workflow-name-display {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+}
+
+.workflow-name-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .zoom-controls {
   display: flex;
   align-items: center;
@@ -2479,6 +2734,20 @@ onUnmounted(() => {
   position: absolute;
   top: 0;
   left: 0;
+  pointer-events: none;
+}
+
+.connections-layer-bottom {
+  z-index: 5; /* 节点下层，z-index 低于节点 */
+}
+
+.connections-layer-top {
+  z-index: 25; /* 节点上层，z-index 高于节点 */
+}
+
+.connection-path-arrow {
+  fill: none;
+  stroke: transparent;
   pointer-events: none;
 }
 
@@ -2539,6 +2808,7 @@ onUnmounted(() => {
   border: 2px solid transparent;
   cursor: move;
   transition: border-color 0.2s, box-shadow 0.2s;
+  z-index: 10; /* 在底层连线上面，顶层连线下面 */
 }
 
 .flow-node:hover {
@@ -2682,6 +2952,8 @@ onUnmounted(() => {
 .output-port {
   position: absolute;
   right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
   width: 12px;
   height: 12px;
   border-radius: 50%;
@@ -2695,7 +2967,7 @@ onUnmounted(() => {
 
 .output-port:hover {
   background: #22d3ee;
-  transform: scale(1.2);
+  transform: translateY(-50%) scale(1.2);
   box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
 }
 

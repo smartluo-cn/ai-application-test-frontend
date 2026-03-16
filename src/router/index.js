@@ -4,16 +4,39 @@ import MainLayout from '@/layouts/MainLayout.vue'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    // 首页 - 独立页面，不使用 MainLayout
     {
       path: '/',
+      name: 'dashboard',
+      component: () => import('@/views/home/DashboardView.vue'),
+      meta: { title: '首页' },
+    },
+    {
+      path: '/dashboard',
+      redirect: '/',
+    },
+    // 集成验证 - 独立页面
+    {
+      path: '/integration',
+      name: 'integration',
+      component: () => import('@/views/integration/IntegrationView.vue'),
+      meta: { title: '集成验证' },
+    },
+    // 创建项目 - 独立页面
+    {
+      path: '/integration/create-project',
+      name: 'create-project',
+      component: () => import('@/views/integration/CreateProjectView.vue'),
+      meta: { title: '创建项目' },
+    },
+    {
+      path: '/app',
       component: MainLayout,
-      redirect: '/dashboard',
+      redirect: '/app/workflow',
       children: [
         {
           path: 'dashboard',
-          name: 'dashboard',
-          component: () => import('@/views/home/DashboardView.vue'),
-          meta: { title: '首页' },
+          redirect: '/',
         },
         {
           path: 'dataset',

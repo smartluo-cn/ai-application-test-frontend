@@ -19,13 +19,13 @@ const route = useRoute()
 const router = useRouter()
 
 const menuItems = [
-  { index: '1', title: '首页', icon: 'HomeFilled', route: '/dashboard' },
-  { index: '2', title: '工作流', icon: 'Share', route: '/workflow' },
-  { index: '3', title: '任务管理', icon: 'VideoPlay', route: '/task' },
-  { index: '4', title: '测评集管理', icon: 'FolderOpened', route: '/dataset' },
-  { index: '5', title: '环境管理', icon: 'Setting', route: '/environment' },
-  { index: '6', title: '插件管理', icon: 'Connection', route: '/plugin' },
-  { index: '7', title: '报告管理', icon: 'DataAnalysis', route: '/result' },
+  { index: '1', title: '首页', icon: 'HomeFilled', route: '/' },
+  { index: '2', title: '工作流', icon: 'Share', route: '/app/workflow' },
+  { index: '3', title: '任务管理', icon: 'VideoPlay', route: '/app/task' },
+  { index: '4', title: '测评集管理', icon: 'FolderOpened', route: '/app/dataset' },
+  { index: '5', title: '环境管理', icon: 'Setting', route: '/app/environment' },
+  { index: '6', title: '插件管理', icon: 'Connection', route: '/app/plugin' },
+  { index: '7', title: '报告管理', icon: 'DataAnalysis', route: '/app/result' },
 ]
 
 const iconComponents = {

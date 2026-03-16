@@ -1,19 +1,67 @@
 <script setup>
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   ArrowRight,
   QuestionFilled,
   Bell,
   ArrowDown,
+  UserFilled,
 } from '@element-plus/icons-vue'
-import Web3DBackground from '@/components/home/Web3DBackground.vue'
+import { ElMessage } from 'element-plus'
+import Integration3DBackground from '@/components/integration/Integration3DBackground.vue'
 
 const router = useRouter()
 
+// 电流动画相关
+const activeCardIndex = ref(-1)
+let animationTimer = null
+
+onMounted(() => {
+  startCurrentAnimation()
+})
+
+onUnmounted(() => {
+  if (animationTimer) {
+    clearInterval(animationTimer)
+  }
+})
+
+// 电流动画 - 每4秒循环一次
+const startCurrentAnimation = () => {
+  const cycleDuration = 4000 // 4秒一个周期
+  const card1Time = 1500 // 第一个卡片触发时间
+  const card2Time = 2800 // 第二个卡片触发时间
+
+  const animate = () => {
+    // 重置
+    activeCardIndex.value = -1
+
+    // 第一个卡片跳动
+    setTimeout(() => {
+      activeCardIndex.value = 0
+      setTimeout(() => {
+        activeCardIndex.value = -1
+      }, 500)
+    }, card1Time)
+
+    // 第二个卡片跳动
+    setTimeout(() => {
+      activeCardIndex.value = 1
+      setTimeout(() => {
+        activeCardIndex.value = -1
+      }, 500)
+    }, card2Time)
+  }
+
+  animate()
+  animationTimer = setInterval(animate, cycleDuration)
+}
+
 // 顶部菜单项
 const menuItems = [
-  { label: '首页', path: '/dashboard', active: true },
-  { label: '集成验证', path: '/integration' },
+  { label: '首页', path: '/' },
+  { label: '集成验证', path: '/integration', active: true },
   { label: '方案体验', path: '/experience' },
   { label: '在线实训', path: '/training' },
 ]
@@ -22,21 +70,15 @@ const menuItems = [
 const featureCards = [
   {
     id: 1,
-    title: '了解系统',
-    icon: '📖',
-    desc: '系统介绍与功能说明',
+    title: '自助验证',
+    icon: '🔧',
+    desc: '自助完成集成验证测试',
   },
   {
     id: 2,
-    title: '系统使用指南',
-    icon: '📋',
-    desc: '详细操作指南文档',
-  },
-  {
-    id: 3,
-    title: '权限申请指南',
-    icon: '📝',
-    desc: '权限申请流程说明',
+    title: '认证测试',
+    icon: '✅',
+    desc: '官方认证测试服务',
   },
 ]
 
@@ -54,6 +96,35 @@ const handleStart = () => {
 
 const handleProgress = () => {
   router.push('/app/task')
+}
+
+// 下拉菜单点击
+const handleDropdownCommand = (command) => {
+  if (command === 'verify') {
+    router.push('/integration/create-project')
+  } else if (command === 'certify') {
+    router.push('/integration/create-project')
+  }
+}
+
+// 用户下拉菜单命令
+const handleUserCommand = (command) => {
+  if (command === 'logout') {
+    ElMessage.info('退出登录')
+  } else {
+    ElMessage.info(`跳转到${command}`)
+  }
+}
+
+// 卡片点击
+const handleCardClick = (card) => {
+  if (card.id === 1) {
+    // 自助验证 - 跳转到创建项目页面
+    router.push('/integration/create-project')
+  } else if (card.id === 2) {
+    // 认证测试 - 跳转到认证页面
+    router.push('/integration/create-project')
+  }
 }
 </script>
 
@@ -92,10 +163,23 @@ const handleProgress = () => {
           <div class="header-action">
             <span>帮助</span>
           </div>
-          <div class="header-action phone-dropdown">
-            <span>17721884685</span>
-            <el-icon :size="12"><ArrowDown /></el-icon>
-          </div>
+          <el-dropdown trigger="hover" @command="handleUserCommand">
+            <div class="header-action user-dropdown">
+              <el-icon :size="18"><UserFilled /></el-icon>
+              <span>17721884685</span>
+              <el-icon :size="12"><ArrowDown /></el-icon>
+            </div>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="training">我的实训</el-dropdown-item>
+                <el-dropdown-item command="projects">我的项目</el-dropdown-item>
+                <el-dropdown-item command="tickets">我的工单</el-dropdown-item>
+                <el-dropdown-item command="todos">我的代办</el-dropdown-item>
+                <el-dropdown-item command="account">我的账号</el-dropdown-item>
+                <el-dropdown-item divided command="logout">退出</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
       </div>
     </header>
@@ -103,24 +187,33 @@ const handleProgress = () => {
     <!-- Hero Banner 区域 -->
     <section class="hero-banner">
       <!-- Web3D 背景 -->
-      <Web3DBackground />
+      <Integration3DBackground />
       <div class="hero-bg-overlay"></div>
 
       <div class="hero-content">
         <div class="hero-text">
-          <h1 class="hero-title">GNEEC LIVE</h1>
-          <p class="hero-subtitle">让服务解决方案触手可及</p>
+          <h1 class="hero-title">集成验证</h1>
+          <p class="hero-subtitle">专业的集成验证解决方案</p>
           <div class="hero-actions">
-            <button class="hero-btn primary" @click="handleStart">
-              开始使用
-            </button>
+            <el-dropdown trigger="hover" @command="handleDropdownCommand">
+              <button class="hero-btn primary dropdown-btn">
+                创建项目
+                <el-icon class="dropdown-icon"><ArrowDown /></el-icon>
+              </button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="verify">验证项目</el-dropdown-item>
+                  <el-dropdown-item command="certify">认证项目</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
             <button class="hero-btn secondary" @click="handleProgress">
-              查看申请进度
+              查看验证进度
             </button>
           </div>
           <p class="hero-note">
             <el-icon><QuestionFilled /></el-icon>
-            系统使用权限正在审批，如有疑问请联系技术支持
+            如有疑问请联系技术支持
           </p>
         </div>
 
@@ -137,9 +230,11 @@ const handleProgress = () => {
     <section class="features-section">
       <div class="features-container">
         <div
-          v-for="card in featureCards"
+          v-for="(card, index) in featureCards"
           :key="card.id"
           class="feature-card"
+          :class="{ 'pulse-active': activeCardIndex === index }"
+          @click="handleCardClick(card)"
         >
           <div class="card-icon">{{ card.icon }}</div>
           <div class="card-content">
@@ -149,6 +244,13 @@ const handleProgress = () => {
             </div>
           </div>
         </div>
+      </div>
+      <!-- 电流流动效果 -->
+      <div class="current-flow-container">
+        <div class="current-flow">
+          <div class="current-pulse"></div>
+        </div>
+        <div class="current-flow-glow"></div>
       </div>
     </section>
 
@@ -165,7 +267,7 @@ const handleProgress = () => {
 /* 重置页面样式 */
 .home-page {
   min-height: 100vh;
-  background: #f5f5f5;
+  background: #fff;
   display: flex;
   flex-direction: column;
 }
@@ -405,15 +507,19 @@ const handleProgress = () => {
 /* 功能卡片区 */
 .features-section {
   background: #fff;
-  padding: 40px 24px;
+  padding: 40px 24px 80px;
+  position: relative;
+  flex: 1;
 }
 
 .features-container {
-  max-width: 1400px;
+  max-width: 800px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 24px;
+  position: relative;
+  z-index: 2;
 }
 
 .feature-card {
@@ -430,9 +536,120 @@ const handleProgress = () => {
 }
 
 .feature-card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(230, 57, 70, 0.15);
   border-color: #e63946;
+  animation: card-bounce 0.5s ease forwards;
+}
+
+.feature-card.pulse-active {
+  animation: card-pulse-bounce 0.5s ease forwards;
+  box-shadow: 0 8px 24px rgba(230, 57, 70, 0.2);
+  border-color: #e63946;
+}
+
+@keyframes card-bounce {
+  0% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-12px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+  70% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes card-pulse-bounce {
+  0% {
+    transform: translateY(0);
+  }
+  25% {
+    transform: translateY(-15px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+  75% {
+    transform: translateY(-12px);
+  }
+  100% {
+    transform: translateY(-6px);
+  }
+}
+
+/* 电流流动效果 */
+.current-flow-container {
+  position: relative;
+  max-width: 800px;
+  margin: 40px auto 0;
+  height: 4px;
+}
+
+.current-flow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(230, 57, 70, 0.2), transparent);
+  overflow: hidden;
+}
+
+.current-pulse {
+  position: absolute;
+  top: 0;
+  left: -100px;
+  width: 100px;
+  height: 100%;
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(230, 57, 70, 0.4),
+    rgba(230, 57, 70, 1),
+    rgba(244, 162, 97, 0.8),
+    transparent
+  );
+  animation: current-move 4s linear infinite;
+  box-shadow: 0 0 20px rgba(230, 57, 70, 0.5);
+}
+
+@keyframes current-move {
+  0% {
+    left: -100px;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+.current-flow-glow {
+  position: absolute;
+  top: -8px;
+  left: 0;
+  right: 0;
+  height: 18px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(230, 57, 70, 0.1) 20%,
+    rgba(230, 57, 70, 0.15) 50%,
+    rgba(230, 57, 70, 0.1) 80%,
+    transparent 100%
+  );
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .card-icon {
@@ -475,7 +692,9 @@ const handleProgress = () => {
 .page-footer {
   background: #f8f9fa;
   padding: 24px;
-  margin-top: auto;
+  flex-shrink: 0;
+  margin-top: 0;
+  border-top: 1px solid #e8e8e8;
 }
 
 .footer-content {
@@ -494,10 +713,6 @@ const handleProgress = () => {
 @media (max-width: 1024px) {
   .hero-center-decor {
     display: none;
-  }
-
-  .features-container {
-    grid-template-columns: repeat(2, 1fr);
   }
 }
 
