@@ -787,6 +787,10 @@ const selectNode = (node, event) => {
   if (node.type === 'condition') {
     initConditionConfig()
   }
+  // 初始化文本清洗节点配置
+  if (node.type === 'textClean') {
+    initTextCleanConfig()
+  }
 }
 
 // 选中连线
@@ -938,6 +942,97 @@ const updateConditionOutputs = () => {
     name: '默认',
   })
   selectedNode.value.outputs = outputs
+}
+
+// 测评集列表数据
+const datasetList = ref([
+  {
+    id: '1',
+    name: '通用对话测评集',
+    dictionaryId: 'dict-1',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'input', label: '输入', type: 'string' },
+      { key: 'expectedOutput', label: '期望输出', type: 'string' },
+    ],
+  },
+  {
+    id: '2',
+    name: '代码生成测评集',
+    dictionaryId: 'dict-2',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'prompt', label: '提示词', type: 'string' },
+      { key: 'expectedCode', label: '期望代码', type: 'string' },
+    ],
+  },
+  {
+    id: '3',
+    name: '文本摘要测评集',
+    dictionaryId: 'dict-3',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'originalText', label: '原文', type: 'string' },
+      { key: 'expectedSummary', label: '期望摘要', type: 'string' },
+    ],
+  },
+  {
+    id: '4',
+    name: '情感分析测评集',
+    dictionaryId: 'dict-5',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'text', label: '文本', type: 'string' },
+      { key: 'expectedSentiment', label: '期望情感', type: 'enum' },
+    ],
+  },
+  {
+    id: '5',
+    name: '翻译能力测评集',
+    dictionaryId: 'dict-6',
+    columns: [
+      { key: 'id', label: 'ID', type: 'string' },
+      { key: 'sourceText', label: '源文本', type: 'string' },
+      { key: 'expectedTranslation', label: '期望翻译', type: 'string' },
+    ],
+  },
+])
+
+// 初始化文本清洗节点配置
+const initTextCleanConfig = () => {
+  if (!selectedNode.value) return
+  if (!selectedNode.value.config.inputType) {
+    selectedNode.value.config.inputType = 'text' // 'text' | 'dataset'
+    selectedNode.value.config.textContent = ''
+    selectedNode.value.config.datasetId = ''
+    selectedNode.value.config.datasetField = ''
+    // 清洗规则默认值
+    selectedNode.value.config.removeExtraSpaces = true
+    selectedNode.value.config.removeHtmlTags = false
+    selectedNode.value.config.removeSpecialChars = false
+    selectedNode.value.config.normalizeNewlines = true
+    selectedNode.value.config.trimWhitespace = true
+  }
+}
+
+// 获取选中的测评集
+const getSelectedDataset = () => {
+  if (!selectedNode.value || !selectedNode.value.config.datasetId) return null
+  return datasetList.value.find((d) => d.id === selectedNode.value.config.datasetId)
+}
+
+// 获取测评集的字段列表（仅字符串类型）
+const getDatasetFields = () => {
+  const dataset = getSelectedDataset()
+  if (!dataset) return []
+  return dataset.columns.filter((col) => col.type === 'string')
+}
+
+// 当测评集选择变化时，重置字段选择
+const onDatasetChange = () => {
+  if (selectedNode.value) {
+    selectedNode.value.config.datasetField = ''
+  }
 }
 
 // 显示添加节点弹窗
@@ -1870,6 +1965,93 @@ onUnmounted(() => {
             </div>
           </template>
 
+          <!-- 文本清洗节点配置 -->
+          <template v-if="selectedNode.type === 'textClean'">
+            <div class="config-item">
+              <label>输入类型</label>
+              <el-radio-group v-model="selectedNode.config.inputType" class="input-type-radio">
+                <el-radio value="text">直接输入文本</el-radio>
+                <el-radio value="dataset">关联测评集</el-radio>
+              </el-radio-group>
+            </div>
+
+            <!-- 直接输入文本 -->
+            <div v-if="selectedNode.config.inputType === 'text'" class="config-item">
+              <label>输入文本</label>
+              <el-input
+                v-model="selectedNode.config.textContent"
+                type="textarea"
+                :rows="6"
+                placeholder="请输入需要清洗的文本内容"
+              />
+            </div>
+
+            <!-- 关联测评集 -->
+            <div v-if="selectedNode.config.inputType === 'dataset'" class="config-item">
+              <label>选择测评集</label>
+              <el-select
+                v-model="selectedNode.config.datasetId"
+                placeholder="请选择测评集"
+                style="width: 100%"
+                @change="onDatasetChange"
+              >
+                <el-option
+                  v-for="dataset in datasetList"
+                  :key="dataset.id"
+                  :label="dataset.name"
+                  :value="dataset.id"
+                />
+              </el-select>
+            </div>
+
+            <div
+              v-if="selectedNode.config.inputType === 'dataset' && selectedNode.config.datasetId"
+              class="config-item"
+            >
+              <label>选择字段</label>
+              <el-select
+                v-model="selectedNode.config.datasetField"
+                placeholder="请选择要清洗的字段"
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="field in getDatasetFields()"
+                  :key="field.key"
+                  :label="field.label"
+                  :value="field.key"
+                />
+              </el-select>
+              <div v-if="getSelectedDataset()" class="dataset-info">
+                <el-icon :size="14" color="#909399"><Document /></el-icon>
+                <span>已选择：{{ getSelectedDataset()?.name }}</span>
+              </div>
+            </div>
+
+            <!-- 清洗规则配置 -->
+            <div class="config-item">
+              <div class="config-item-header">
+                <label>清洗规则</label>
+              </div>
+              <div class="clean-rules">
+                <el-checkbox v-model="selectedNode.config.removeExtraSpaces">
+                  去除多余空格
+                </el-checkbox>
+                <el-checkbox v-model="selectedNode.config.removeHtmlTags">
+                  去除HTML标签
+                </el-checkbox>
+                <el-checkbox v-model="selectedNode.config.removeSpecialChars">
+                  去除特殊字符
+                </el-checkbox>
+                <el-checkbox v-model="selectedNode.config.normalizeNewlines">
+                  标准化换行符
+                </el-checkbox>
+                <el-checkbox v-model="selectedNode.config.trimWhitespace">
+                  去除首尾空白
+                </el-checkbox>
+              </div>
+            </div>
+          </template>
+
         </div>
       </div>
     </div>
@@ -2752,5 +2934,68 @@ onUnmounted(() => {
 
 .debug-logs::-webkit-scrollbar-thumb:hover {
   background: #585b70;
+}
+
+/* 文本清洗节点配置样式 */
+.input-type-radio {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.input-type-radio .el-radio {
+  height: auto;
+  margin-right: 0;
+  padding: 12px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.input-type-radio .el-radio:hover {
+  border-color: #6366f1;
+  background: #f5f3ff;
+}
+
+.input-type-radio .el-radio.is-checked {
+  border-color: #6366f1;
+  background: #f5f3ff;
+}
+
+.input-type-radio .el-radio__label {
+  font-size: 14px;
+  color: #374151;
+}
+
+.dataset-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #f5f7fa;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #606266;
+}
+
+.clean-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.clean-rules .el-checkbox {
+  height: auto;
+  margin-right: 0;
+}
+
+.clean-rules .el-checkbox__label {
+  font-size: 14px;
+  color: #374151;
 }
 </style>
