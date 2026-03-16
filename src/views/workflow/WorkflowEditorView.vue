@@ -783,6 +783,10 @@ const selectNode = (node, event) => {
   hideContextMenu()
   selectedNode.value = node
   selectedConnection.value = null
+  // 初始化条件判断节点配置
+  if (node.type === 'condition') {
+    initConditionConfig()
+  }
 }
 
 // 选中连线
@@ -823,6 +827,117 @@ const addInputParam = () => {
 const removeInputParam = (index) => {
   if (!selectedNode.value || !selectedNode.value.inputParams) return
   selectedNode.value.inputParams.splice(index, 1)
+}
+
+// 获取可用的变量列表（从开始节点的输入参数获取）
+const getAvailableVariables = () => {
+  const startNode = nodes.value.find((n) => n.type === 'start')
+  if (!startNode || !startNode.inputParams) return []
+  return startNode.inputParams.map((param) => ({
+    name: param.name,
+    type: param.type,
+  }))
+}
+
+// 初始化条件判断节点配置
+const initConditionConfig = () => {
+  if (!selectedNode.value) return
+  if (!selectedNode.value.config.branches) {
+    selectedNode.value.config.branches = [
+      {
+        id: `branch-${Date.now()}`,
+        name: '分支1',
+        logic: 'and',
+        conditions: [
+          {
+            id: `cond-${Date.now()}`,
+            variable: '',
+            operator: 'eq',
+            value: '',
+          },
+        ],
+      },
+    ]
+  }
+}
+
+// 添加条件分支
+const addConditionBranch = () => {
+  if (!selectedNode.value) return
+  initConditionConfig()
+  const branchCount = selectedNode.value.config.branches.length + 1
+  selectedNode.value.config.branches.push({
+    id: `branch-${Date.now()}`,
+    name: `分支${branchCount}`,
+    logic: 'and',
+    conditions: [
+      {
+        id: `cond-${Date.now()}`,
+        variable: '',
+        operator: 'eq',
+        value: '',
+      },
+    ],
+  })
+  // 更新节点的输出端口
+  updateConditionOutputs()
+}
+
+// 删除条件分支
+const removeConditionBranch = (index) => {
+  if (!selectedNode.value || !selectedNode.value.config.branches) return
+  if (selectedNode.value.config.branches.length <= 1) return
+  selectedNode.value.config.branches.splice(index, 1)
+  // 更新节点的输出端口
+  updateConditionOutputs()
+}
+
+// 添加条件
+const addCondition = (branchIndex) => {
+  if (!selectedNode.value || !selectedNode.value.config.branches) return
+  const branch = selectedNode.value.config.branches[branchIndex]
+  if (!branch.conditions) {
+    branch.conditions = []
+  }
+  branch.conditions.push({
+    id: `cond-${Date.now()}`,
+    variable: '',
+    operator: 'eq',
+    value: '',
+  })
+}
+
+// 删除条件
+const removeCondition = (branchIndex, condIndex) => {
+  if (!selectedNode.value || !selectedNode.value.config.branches) return
+  const branch = selectedNode.value.config.branches[branchIndex]
+  if (!branch.conditions) return
+  branch.conditions.splice(condIndex, 1)
+  // 如果分支没有条件了，添加一个空条件
+  if (branch.conditions.length === 0) {
+    branch.conditions.push({
+      id: `cond-${Date.now()}`,
+      variable: '',
+      operator: 'eq',
+      value: '',
+    })
+  }
+}
+
+// 更新条件节点的输出端口
+const updateConditionOutputs = () => {
+  if (!selectedNode.value || selectedNode.value.type !== 'condition') return
+  const branches = selectedNode.value.config.branches || []
+  const outputs = branches.map((branch, index) => ({
+    id: `out-branch-${index}`,
+    name: branch.name,
+  }))
+  // 添加默认分支输出
+  outputs.push({
+    id: 'out-default',
+    name: '默认',
+  })
+  selectedNode.value.outputs = outputs
 }
 
 // 显示添加节点弹窗
@@ -936,6 +1051,29 @@ const addConnectedNode = (type) => {
     newNode.inputParams = []
   } else if (type === 'end') {
     newNode.outputs = []
+  }
+
+  // 条件判断节点特殊处理
+  if (type === 'condition') {
+    newNode.config.branches = [
+      {
+        id: `branch-${Date.now()}`,
+        name: '分支1',
+        logic: 'and',
+        conditions: [
+          {
+            id: `cond-${Date.now()}`,
+            variable: '',
+            operator: 'eq',
+            value: '',
+          },
+        ],
+      },
+    ]
+    newNode.outputs = [
+      { id: 'out-branch-0', name: '分支1' },
+      { id: 'out-default', name: '默认' },
+    ]
   }
 
   nodes.value.push(newNode)
@@ -1593,6 +1731,121 @@ onUnmounted(() => {
             </div>
           </template>
 
+          <!-- 条件判断节点配置 -->
+          <template v-if="selectedNode.type === 'condition'">
+            <div class="config-item">
+              <div class="config-item-header">
+                <label>条件分支</label>
+                <el-button type="primary" text size="small" :icon="Plus" @click="addConditionBranch">
+                  添加分支
+                </el-button>
+              </div>
+              <div class="condition-branches">
+                <div
+                  v-for="(branch, index) in selectedNode.config.branches"
+                  :key="branch.id"
+                  class="condition-branch"
+                >
+                  <div class="branch-header">
+                    <el-input
+                      v-model="branch.name"
+                      placeholder="分支名称"
+                      size="small"
+                      class="branch-name-input"
+                    />
+                    <el-button
+                      v-if="selectedNode.config.branches.length > 1"
+                      type="danger"
+                      text
+                      size="small"
+                      :icon="Delete"
+                      @click="removeConditionBranch(index)"
+                    />
+                  </div>
+                  <div class="branch-conditions">
+                    <div class="condition-logic-toggle">
+                      <el-radio-group v-model="branch.logic" size="small">
+                        <el-radio-button value="and">且(AND)</el-radio-button>
+                        <el-radio-button value="or">或(OR)</el-radio-button>
+                      </el-radio-group>
+                    </div>
+                    <div
+                      v-for="(condition, condIndex) in branch.conditions"
+                      :key="condition.id"
+                      class="condition-row"
+                    >
+                      <el-select
+                        v-model="condition.variable"
+                        placeholder="选择变量"
+                        size="small"
+                        class="condition-var"
+                        filterable
+                        allow-create
+                      >
+                        <el-option
+                          v-for="param in getAvailableVariables()"
+                          :key="param.name"
+                          :label="param.name"
+                          :value="param.name"
+                        />
+                      </el-select>
+                      <el-select
+                        v-model="condition.operator"
+                        placeholder="运算符"
+                        size="small"
+                        class="condition-op"
+                      >
+                        <el-option label="等于" value="eq" />
+                        <el-option label="不等于" value="neq" />
+                        <el-option label="大于" value="gt" />
+                        <el-option label="大于等于" value="gte" />
+                        <el-option label="小于" value="lt" />
+                        <el-option label="小于等于" value="lte" />
+                        <el-option label="包含" value="contains" />
+                        <el-option label="不包含" value="notContains" />
+                        <el-option label="为空" value="isEmpty" />
+                        <el-option label="不为空" value="isNotEmpty" />
+                        <el-option label="为真" value="isTrue" />
+                        <el-option label="为假" value="isFalse" />
+                      </el-select>
+                      <el-input
+                        v-if="!['isEmpty', 'isNotEmpty', 'isTrue', 'isFalse'].includes(condition.operator)"
+                        v-model="condition.value"
+                        placeholder="比较值"
+                        size="small"
+                        class="condition-val"
+                      />
+                      <el-button
+                        type="danger"
+                        text
+                        size="small"
+                        :icon="Delete"
+                        class="condition-delete-btn"
+                        @click="removeCondition(index, condIndex)"
+                      />
+                    </div>
+                    <el-button
+                      type="primary"
+                      text
+                      size="small"
+                      :icon="Plus"
+                      class="add-condition-btn"
+                      @click="addCondition(index)"
+                    >
+                      添加条件
+                    </el-button>
+                  </div>
+                </div>
+                <!-- 默认分支 -->
+                <div class="condition-branch default-branch">
+                  <div class="branch-header">
+                    <span class="branch-name-label">默认分支</span>
+                    <span class="branch-hint">当以上条件都不满足时执行</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
 
         </div>
       </div>
@@ -1871,6 +2124,98 @@ onUnmounted(() => {
 .config-item .el-select,
 .config-item .el-textarea {
   width: 100%;
+}
+
+/* 条件分支配置样式 */
+.condition-branches {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.condition-branch {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fafbfc;
+}
+
+.condition-branch.default-branch {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
+.branch-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.condition-branch.default-branch .branch-header {
+  background: #f0fdf4;
+  border-bottom-color: #86efac;
+}
+
+.branch-name-input {
+  flex: 1;
+  max-width: 200px;
+}
+
+.branch-name-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.branch-hint {
+  font-size: 12px;
+  color: #6b7280;
+  margin-left: 8px;
+}
+
+.branch-conditions {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.condition-logic-toggle {
+  margin-bottom: 4px;
+}
+
+.condition-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.condition-var {
+  flex: 1;
+  min-width: 100px;
+}
+
+.condition-op {
+  width: 110px;
+  flex-shrink: 0;
+}
+
+.condition-val {
+  flex: 1;
+  min-width: 100px;
+}
+
+.condition-delete-btn {
+  flex-shrink: 0;
+  padding: 4px;
+}
+
+.add-condition-btn {
+  align-self: flex-start;
+  margin-top: 4px;
 }
 
 /* 合并的连线/添加按钮 */
