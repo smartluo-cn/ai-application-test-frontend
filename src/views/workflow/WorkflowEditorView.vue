@@ -1012,11 +1012,7 @@ const initTextCleanConfig = () => {
     selectedNode.value.config.removeSpecialChars = false
     selectedNode.value.config.normalizeNewlines = true
     selectedNode.value.config.trimWhitespace = true
-    // 输出格式配置
-    selectedNode.value.config.outputFormat = 'json' // 'json' | 'csv' | 'text'
-    selectedNode.value.config.outputStructure = 'array' // 'array' | 'object' | 'flattened'
-    selectedNode.value.config.includeOriginal = false // 是否包含原始文本
-    selectedNode.value.config.fieldNaming = 'original' // 'original' | 'camelCase' | 'snake_case'
+    // 输出格式根据输入类型自动确定，无需手动配置
   }
 }
 
@@ -1045,126 +1041,24 @@ const getOutputFormatPreview = () => {
   if (!selectedNode.value) return ''
 
   const config = selectedNode.value.config
-  const format = config.outputFormat || 'json'
-  const structure = config.outputStructure || 'array'
-  const naming = config.fieldNaming || 'original'
-  const includeOriginal = config.includeOriginal || false
-  const fields = config.datasetFields || []
+  const inputType = config.inputType || 'text'
 
-  // 根据字段命名生成示例字段名
-  const getFieldNames = (originalNames) => {
-    if (naming === 'camelCase') {
-      return originalNames.map((name) =>
-        name.replace(/_([a-z])/g, (_, c) => c.toUpperCase())
-      )
-    } else if (naming === 'snake_case') {
-      return originalNames.map((name) =>
-        name.replace(/([A-Z])/g, '_$1').toLowerCase()
-      )
-    }
-    return originalNames
+  // 根据输入类型自动生成输出格式预览
+  if (inputType === 'text') {
+    // 文本输入：输出单个字符串
+    return `"清洗后的文本内容示例"`
+  } else {
+    // 测评集输入：输出数组形式的JSON
+    const fields = config.datasetFields || []
+    const sampleFields = fields.length > 0 ? fields : ['question', 'answer']
+
+    const items = sampleFields.map((field) => ({
+      field: field,
+      originalContent: `原始${field}内容示例`,
+      cleanedContent: `清洗后的${field}内容示例`,
+    }))
+    return JSON.stringify(items, null, 2)
   }
-
-  // 获取示例字段名
-  const sampleFields =
-    fields.length > 0
-      ? getFieldNames(fields)
-      : ['question', 'answer', 'context']
-
-  // 生成示例数据
-  const generateSample = () => {
-    const cleanedSuffix = naming === 'camelCase' ? 'Cleaned' : '_cleaned'
-    const originalSuffix = naming === 'camelCase' ? 'Original' : '_original'
-
-    if (structure === 'array') {
-      if (format === 'json') {
-        const items = sampleFields.map((field) => ({
-          field,
-          cleaned: `清洗后的${field}内容示例`,
-          ...(includeOriginal && { original: `原始${field}内容示例` }),
-        }))
-        return JSON.stringify(items, null, 2)
-      } else if (format === 'csv') {
-        const headers = includeOriginal
-          ? 'field,cleaned,original'
-          : 'field,cleaned'
-        const rows = sampleFields.map((f) =>
-          includeOriginal
-            ? `${f},"清洗后的${f}内容示例","原始${f}内容示例"`
-            : `${f},"清洗后的${f}内容示例"`
-        )
-        return [headers, ...rows].join('\n')
-      } else {
-        return sampleFields
-          .map((f) => `【${f}】\n清洗后的${f}内容示例`)
-          .join('\n\n---\n\n')
-      }
-    } else if (structure === 'object') {
-      if (format === 'json') {
-        const obj = {}
-        sampleFields.forEach((field) => {
-          obj[field + cleanedSuffix] = `清洗后的${field}内容示例`
-          if (includeOriginal) {
-            obj[field + originalSuffix] = `原始${field}内容示例`
-          }
-        })
-        return JSON.stringify(obj, null, 2)
-      } else if (format === 'csv') {
-        const headers = sampleFields
-          .flatMap((f) =>
-            includeOriginal
-              ? [`${f}${cleanedSuffix}`, `${f}${originalSuffix}`]
-              : [`${f}${cleanedSuffix}`]
-          )
-          .join(',')
-        const values = sampleFields
-          .flatMap((f) =>
-            includeOriginal
-              ? [`"清洗后的${f}内容示例"`, `"原始${f}内容示例"`]
-              : [`"清洗后的${f}内容示例"`]
-          )
-          .join(',')
-        return `${headers}\n${values}`
-      } else {
-        return sampleFields
-          .map(
-            (f) =>
-              `【${f}${cleanedSuffix}】\n清洗后的${f}内容示例${
-                includeOriginal ? `\n【${f}${originalSuffix}】\n原始${f}内容示例` : ''
-              }`
-          )
-          .join('\n\n')
-      }
-    } else {
-      // flattened
-      if (format === 'json') {
-        const flat = {
-          cleanedText: sampleFields.map((f) => `清洗后的${f}内容示例`).join(' '),
-          fields: sampleFields,
-        }
-        if (includeOriginal) {
-          flat.originalText = sampleFields.map((f) => `原始${f}内容示例`).join(' ')
-        }
-        return JSON.stringify(flat, null, 2)
-      } else if (format === 'csv') {
-        const headers = includeOriginal
-          ? 'cleanedText,originalText,fields'
-          : 'cleanedText,fields'
-        const values = includeOriginal
-          ? `"${sampleFields.map((f) => `清洗后的${f}内容示例`).join(' ')}","${sampleFields.map((f) => `原始${f}内容示例`).join(' ')}","${sampleFields.join(',')}"`
-          : `"${sampleFields.map((f) => `清洗后的${f}内容示例`).join(' ')}","${sampleFields.join(',')}"`
-        return `${headers}\n${values}`
-      } else {
-        let text = `清洗后文本：\n${sampleFields.map((f) => `清洗后的${f}内容示例`).join(' ')}`
-        if (includeOriginal) {
-          text += `\n\n原始文本：\n${sampleFields.map((f) => `原始${f}内容示例`).join(' ')}`
-        }
-        return text
-      }
-    }
-  }
-
-  return generateSample()
 }
 
 // 显示添加节点弹窗
@@ -2165,45 +2059,7 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <!-- 输出格式配置 -->
-            <div class="config-item">
-              <div class="config-item-header">
-                <label>输出格式</label>
-              </div>
-              <div class="output-format-section">
-                <div class="format-row">
-                  <span class="format-label">数据格式</span>
-                  <el-radio-group v-model="selectedNode.config.outputFormat" size="small">
-                    <el-radio-button value="json">JSON</el-radio-button>
-                    <el-radio-button value="csv">CSV</el-radio-button>
-                    <el-radio-button value="text">纯文本</el-radio-button>
-                  </el-radio-group>
-                </div>
-                <div class="format-row">
-                  <span class="format-label">结构类型</span>
-                  <el-radio-group v-model="selectedNode.config.outputStructure" size="small">
-                    <el-radio-button value="array">数组</el-radio-button>
-                    <el-radio-button value="object">对象</el-radio-button>
-                    <el-radio-button value="flattened">扁平化</el-radio-button>
-                  </el-radio-group>
-                </div>
-                <div class="format-row">
-                  <span class="format-label">字段命名</span>
-                  <el-radio-group v-model="selectedNode.config.fieldNaming" size="small">
-                    <el-radio-button value="original">保持原样</el-radio-button>
-                    <el-radio-button value="camelCase">驼峰式</el-radio-button>
-                    <el-radio-button value="snake_case">下划线</el-radio-button>
-                  </el-radio-group>
-                </div>
-                <div class="format-row inline">
-                  <el-checkbox v-model="selectedNode.config.includeOriginal">
-                    在输出中包含原始文本
-                  </el-checkbox>
-                </div>
-              </div>
-            </div>
-
-            <!-- 输出格式说明 -->
+            <!-- 输出预览 -->
             <div class="config-item output-preview">
               <div class="config-item-header">
                 <label>输出预览</label>
@@ -2217,18 +2073,45 @@ onUnmounted(() => {
             <div class="config-item">
               <div class="config-item-header">
                 <label>输出参数定义</label>
+                <span class="auto-hint">（根据输入类型自动确定）</span>
               </div>
-              <div class="output-params-definition">
+
+              <!-- 文本输入时的输出参数 -->
+              <div v-if="selectedNode.config.inputType === 'text'" class="output-params-definition">
                 <div class="param-item">
                   <span class="param-name">output</span>
-                  <span class="param-type">
-                    {{ selectedNode.config.inputType === 'text' ? '字符串 (String)' : '数组 (JSON Array)' }}
-                  </span>
+                  <span class="param-type">String</span>
                 </div>
                 <div class="param-desc">
-                  {{ selectedNode.config.inputType === 'text'
-                    ? '清洗后的文本内容，返回字符串类型'
-                    : '清洗后的数据数组，每条记录包含选定字段的清洗结果' }}
+                  清洗后的文本内容，返回字符串类型
+                </div>
+              </div>
+
+              <!-- 测评集输入时的输出参数 -->
+              <div v-if="selectedNode.config.inputType === 'dataset'" class="output-params-definition">
+                <div class="param-item">
+                  <span class="param-name">output</span>
+                  <span class="param-type">JSON Array</span>
+                </div>
+                <div class="param-desc">
+                  清洗后的数据数组，每个数组元素包含以下字段：
+                </div>
+                <div class="param-fields">
+                  <div class="field-item">
+                    <span class="field-name">field</span>
+                    <span class="field-type">String</span>
+                    <span class="field-desc">字段名称</span>
+                  </div>
+                  <div class="field-item">
+                    <span class="field-name">originalContent</span>
+                    <span class="field-type">String</span>
+                    <span class="field-desc">清洗前的内容</span>
+                  </div>
+                  <div class="field-item">
+                    <span class="field-name">cleanedContent</span>
+                    <span class="field-type">String</span>
+                    <span class="field-desc">清洗后的内容</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -3313,5 +3196,67 @@ onUnmounted(() => {
   font-size: 13px;
   color: #6b7280;
   line-height: 1.5;
+}
+
+.auto-hint {
+  font-size: 12px;
+  color: #9ca3af;
+  font-weight: normal;
+  margin-left: 4px;
+}
+
+.param-fields {
+  margin-top: 12px;
+  padding: 12px;
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.field-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.field-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.field-item:first-child {
+  padding-top: 0;
+}
+
+.field-name {
+  display: inline-block;
+  padding: 3px 8px;
+  background: #6366f1;
+  color: #fff;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  min-width: 120px;
+}
+
+.field-type {
+  display: inline-block;
+  padding: 3px 8px;
+  background: #ecfdf5;
+  color: #059669;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid #a7f3d0;
+  min-width: 80px;
+  text-align: center;
+}
+
+.field-desc {
+  font-size: 12px;
+  color: #6b7280;
 }
 </style>
