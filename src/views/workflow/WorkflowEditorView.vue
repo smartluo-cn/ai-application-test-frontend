@@ -1005,13 +1005,18 @@ const initTextCleanConfig = () => {
     selectedNode.value.config.inputType = 'text' // 'text' | 'dataset'
     selectedNode.value.config.textContent = ''
     selectedNode.value.config.datasetId = ''
-    selectedNode.value.config.datasetField = ''
+    selectedNode.value.config.datasetFields = [] // 支持多选字段
     // 清洗规则默认值
     selectedNode.value.config.removeExtraSpaces = true
     selectedNode.value.config.removeHtmlTags = false
     selectedNode.value.config.removeSpecialChars = false
     selectedNode.value.config.normalizeNewlines = true
     selectedNode.value.config.trimWhitespace = true
+    // 输出格式配置
+    selectedNode.value.config.outputFormat = 'json' // 'json' | 'csv' | 'text'
+    selectedNode.value.config.outputStructure = 'array' // 'array' | 'object' | 'flattened'
+    selectedNode.value.config.includeOriginal = false // 是否包含原始文本
+    selectedNode.value.config.fieldNaming = 'original' // 'original' | 'camelCase' | 'snake_case'
   }
 }
 
@@ -1031,8 +1036,135 @@ const getDatasetFields = () => {
 // 当测评集选择变化时，重置字段选择
 const onDatasetChange = () => {
   if (selectedNode.value) {
-    selectedNode.value.config.datasetField = ''
+    selectedNode.value.config.datasetFields = []
   }
+}
+
+// 获取输出格式预览
+const getOutputFormatPreview = () => {
+  if (!selectedNode.value) return ''
+
+  const config = selectedNode.value.config
+  const format = config.outputFormat || 'json'
+  const structure = config.outputStructure || 'array'
+  const naming = config.fieldNaming || 'original'
+  const includeOriginal = config.includeOriginal || false
+  const fields = config.datasetFields || []
+
+  // 根据字段命名生成示例字段名
+  const getFieldNames = (originalNames) => {
+    if (naming === 'camelCase') {
+      return originalNames.map((name) =>
+        name.replace(/_([a-z])/g, (_, c) => c.toUpperCase())
+      )
+    } else if (naming === 'snake_case') {
+      return originalNames.map((name) =>
+        name.replace(/([A-Z])/g, '_$1').toLowerCase()
+      )
+    }
+    return originalNames
+  }
+
+  // 获取示例字段名
+  const sampleFields =
+    fields.length > 0
+      ? getFieldNames(fields)
+      : ['question', 'answer', 'context']
+
+  // 生成示例数据
+  const generateSample = () => {
+    const cleanedSuffix = naming === 'camelCase' ? 'Cleaned' : '_cleaned'
+    const originalSuffix = naming === 'camelCase' ? 'Original' : '_original'
+
+    if (structure === 'array') {
+      if (format === 'json') {
+        const items = sampleFields.map((field) => ({
+          field,
+          cleaned: `清洗后的${field}内容示例`,
+          ...(includeOriginal && { original: `原始${field}内容示例` }),
+        }))
+        return JSON.stringify(items, null, 2)
+      } else if (format === 'csv') {
+        const headers = includeOriginal
+          ? 'field,cleaned,original'
+          : 'field,cleaned'
+        const rows = sampleFields.map((f) =>
+          includeOriginal
+            ? `${f},"清洗后的${f}内容示例","原始${f}内容示例"`
+            : `${f},"清洗后的${f}内容示例"`
+        )
+        return [headers, ...rows].join('\n')
+      } else {
+        return sampleFields
+          .map((f) => `【${f}】\n清洗后的${f}内容示例`)
+          .join('\n\n---\n\n')
+      }
+    } else if (structure === 'object') {
+      if (format === 'json') {
+        const obj = {}
+        sampleFields.forEach((field) => {
+          obj[field + cleanedSuffix] = `清洗后的${field}内容示例`
+          if (includeOriginal) {
+            obj[field + originalSuffix] = `原始${field}内容示例`
+          }
+        })
+        return JSON.stringify(obj, null, 2)
+      } else if (format === 'csv') {
+        const headers = sampleFields
+          .flatMap((f) =>
+            includeOriginal
+              ? [`${f}${cleanedSuffix}`, `${f}${originalSuffix}`]
+              : [`${f}${cleanedSuffix}`]
+          )
+          .join(',')
+        const values = sampleFields
+          .flatMap((f) =>
+            includeOriginal
+              ? [`"清洗后的${f}内容示例"`, `"原始${f}内容示例"`]
+              : [`"清洗后的${f}内容示例"`]
+          )
+          .join(',')
+        return `${headers}\n${values}`
+      } else {
+        return sampleFields
+          .map(
+            (f) =>
+              `【${f}${cleanedSuffix}】\n清洗后的${f}内容示例${
+                includeOriginal ? `\n【${f}${originalSuffix}】\n原始${f}内容示例` : ''
+              }`
+          )
+          .join('\n\n')
+      }
+    } else {
+      // flattened
+      if (format === 'json') {
+        const flat = {
+          cleanedText: sampleFields.map((f) => `清洗后的${f}内容示例`).join(' '),
+          fields: sampleFields,
+        }
+        if (includeOriginal) {
+          flat.originalText = sampleFields.map((f) => `原始${f}内容示例`).join(' ')
+        }
+        return JSON.stringify(flat, null, 2)
+      } else if (format === 'csv') {
+        const headers = includeOriginal
+          ? 'cleanedText,originalText,fields'
+          : 'cleanedText,fields'
+        const values = includeOriginal
+          ? `"${sampleFields.map((f) => `清洗后的${f}内容示例`).join(' ')}","${sampleFields.map((f) => `原始${f}内容示例`).join(' ')}","${sampleFields.join(',')}"`
+          : `"${sampleFields.map((f) => `清洗后的${f}内容示例`).join(' ')}","${sampleFields.join(',')}"`
+        return `${headers}\n${values}`
+      } else {
+        let text = `清洗后文本：\n${sampleFields.map((f) => `清洗后的${f}内容示例`).join(' ')}`
+        if (includeOriginal) {
+          text += `\n\n原始文本：\n${sampleFields.map((f) => `原始${f}内容示例`).join(' ')}`
+        }
+        return text
+      }
+    }
+  }
+
+  return generateSample()
 }
 
 // 显示添加节点弹窗
@@ -2008,9 +2140,12 @@ onUnmounted(() => {
               v-if="selectedNode.config.inputType === 'dataset' && selectedNode.config.datasetId"
               class="config-item"
             >
-              <label>选择字段</label>
+              <label>选择字段（可多选）</label>
               <el-select
-                v-model="selectedNode.config.datasetField"
+                v-model="selectedNode.config.datasetFields"
+                multiple
+                collapse-tags
+                collapse-tags-tooltip
                 placeholder="请选择要清洗的字段"
                 style="width: 100%"
               >
@@ -2024,6 +2159,57 @@ onUnmounted(() => {
               <div v-if="getSelectedDataset()" class="dataset-info">
                 <el-icon :size="14" color="#909399"><Document /></el-icon>
                 <span>已选择：{{ getSelectedDataset()?.name }}</span>
+                <span v-if="selectedNode.config.datasetFields?.length > 0" class="field-count">
+                  （已选 {{ selectedNode.config.datasetFields.length }} 个字段）
+                </span>
+              </div>
+            </div>
+
+            <!-- 输出格式配置 -->
+            <div class="config-item">
+              <div class="config-item-header">
+                <label>输出格式</label>
+              </div>
+              <div class="output-format-section">
+                <div class="format-row">
+                  <span class="format-label">数据格式</span>
+                  <el-radio-group v-model="selectedNode.config.outputFormat" size="small">
+                    <el-radio-button value="json">JSON</el-radio-button>
+                    <el-radio-button value="csv">CSV</el-radio-button>
+                    <el-radio-button value="text">纯文本</el-radio-button>
+                  </el-radio-group>
+                </div>
+                <div class="format-row">
+                  <span class="format-label">结构类型</span>
+                  <el-radio-group v-model="selectedNode.config.outputStructure" size="small">
+                    <el-radio-button value="array">数组</el-radio-button>
+                    <el-radio-button value="object">对象</el-radio-button>
+                    <el-radio-button value="flattened">扁平化</el-radio-button>
+                  </el-radio-group>
+                </div>
+                <div class="format-row">
+                  <span class="format-label">字段命名</span>
+                  <el-radio-group v-model="selectedNode.config.fieldNaming" size="small">
+                    <el-radio-button value="original">保持原样</el-radio-button>
+                    <el-radio-button value="camelCase">驼峰式</el-radio-button>
+                    <el-radio-button value="snake_case">下划线</el-radio-button>
+                  </el-radio-group>
+                </div>
+                <div class="format-row inline">
+                  <el-checkbox v-model="selectedNode.config.includeOriginal">
+                    在输出中包含原始文本
+                  </el-checkbox>
+                </div>
+              </div>
+            </div>
+
+            <!-- 输出格式说明 -->
+            <div class="config-item output-preview">
+              <div class="config-item-header">
+                <label>输出预览</label>
+              </div>
+              <div class="preview-content">
+                <pre class="preview-code">{{ getOutputFormatPreview() }}</pre>
               </div>
             </div>
 
@@ -2997,5 +3183,72 @@ onUnmounted(() => {
 .clean-rules .el-checkbox__label {
   font-size: 14px;
   color: #374151;
+}
+
+/* 输出格式配置样式 */
+.output-format-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.format-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.format-row.inline {
+  padding-top: 8px;
+  border-top: 1px dashed #e5e7eb;
+}
+
+.format-label {
+  flex-shrink: 0;
+  width: 70px;
+  font-size: 13px;
+  color: #606266;
+}
+
+.field-count {
+  color: #6366f1;
+  font-weight: 500;
+}
+
+/* 输出预览样式 */
+.output-preview {
+  margin-top: 8px;
+}
+
+.preview-content {
+  padding: 12px;
+  background: #1e1e2e;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.preview-code {
+  margin: 0;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #cdd6f4;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.config-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.config-item-header label {
+  margin-bottom: 0;
 }
 </style>
