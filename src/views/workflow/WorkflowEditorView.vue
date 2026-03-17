@@ -2101,35 +2101,23 @@ onUnmounted(() => {
                 <span class="node-name">{{ node.name }}</span>
               </div>
 
-              <!-- 开始节点：合并显示输入/输出参数 -->
+              <!-- 开始节点：单行显示输入参数 -->
               <template v-if="node.type === 'start'">
                 <div
                   v-if="getNodeOutputParams(node).length > 0"
-                  class="node-params output-params"
+                  class="node-params inline-params"
                 >
-                  <div class="params-label">输入/输出</div>
-                  <table class="params-table">
-                    <tbody>
-                      <tr
-                        v-for="(param, idx) in getNodeOutputParams(node)"
-                        :key="'inout-' + idx"
-                        class="param-row"
-                      >
-                        <td class="param-name-cell" :class="{ 'param-name-empty': !param.name }">
-                          {{ param.name || '新建参数' }}
-                        </td>
-                        <td class="param-type-cell">{{ param.type }}</td>
-                        <!-- 输出端口在右边 -->
-                        <td class="param-port-cell output-port-cell">
-                          <div
-                            class="output-port"
-                            :title="param.name"
-                            @mousedown.stop="startConnectionFromOutput(node, param, idx, $event)"
-                          ></div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  <span class="params-label">输入</span>
+                  <span class="params-inline-list">
+                    <span
+                      v-for="(param, idx) in getNodeOutputParams(node)"
+                      :key="'inout-' + idx"
+                      class="param-inline-item"
+                      :title="param.name + ': ' + param.type"
+                    >
+                      {{ param.name || '新建参数' }}
+                    </span>
+                  </span>
                 </div>
               </template>
 
@@ -3168,6 +3156,38 @@ onUnmounted(() => {
 .node-params.output-params .param-type-cell {
   background: #ecfdf5;
   color: #10b981;
+}
+
+/* 开始节点单行显示参数样式 */
+.node-params.inline-params {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.node-params.inline-params .params-label {
+  color: #10b981;
+  flex-shrink: 0;
+}
+
+.node-params.inline-params .params-inline-list {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.node-params.inline-params .param-inline-item {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  background: #ecfdf5;
+  color: #10b981;
+  font-size: 10px;
+  border-radius: 3px;
+  white-space: nowrap;
 }
 
 /* 输入端口样式 */
