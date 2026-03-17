@@ -273,10 +273,33 @@ const canvasDragState = reactive({
   startOffsetY: 0,
 })
 
-// 获取端口的实际 DOM 位置
-const getPortDomPosition = (nodeId, paramIndex, type) => {
+// 获取添加按钮的实际 DOM 位置（用于开始节点的连线起点）
+const getActionBtnDomPosition = (nodeId) => {
   const nodeElement = document.querySelector(`[data-node-id="${nodeId}"]`)
   if (!nodeElement) return null
+
+  const btnElement = nodeElement.querySelector('.node-action-btn')
+  if (!btnElement) return null
+
+  const btnRect = btnElement.getBoundingClientRect()
+  const canvasRect = document.querySelector('.canvas')?.getBoundingClientRect()
+  if (!canvasRect) return null
+
+  return {
+    x: btnRect.left + btnRect.width / 2 - canvasRect.left,
+    y: btnRect.top + btnRect.height / 2 - canvasRect.top,
+  }
+}
+
+// 获取端口的实际 DOM 位置
+const getPortDomPosition = (nodeId, paramIndex, type, nodeType = null) => {
+  const nodeElement = document.querySelector(`[data-node-id="${nodeId}"]`)
+  if (!nodeElement) return null
+
+  // 如果是开始节点且类型是输出，使用添加按钮的位置
+  if (nodeType === 'start' && type === 'output') {
+    return getActionBtnDomPosition(nodeId)
+  }
 
   const portSelector = type === 'output' ? '.output-port' : '.input-port'
   const ports = nodeElement.querySelectorAll(portSelector)
@@ -305,8 +328,8 @@ const getConnectionPath = (connection) => {
   const targetParamIndex = connection.targetParamIndex ?? 0
 
   // 尝试使用 DOM 获取端口实际位置
-  const sourcePortPos = getPortDomPosition(sourceNode.id, sourceParamIndex, 'output')
-  const targetPortPos = getPortDomPosition(targetNode.id, targetParamIndex, 'input')
+  const sourcePortPos = getPortDomPosition(sourceNode.id, sourceParamIndex, 'output', sourceNode.type)
+  const targetPortPos = getPortDomPosition(targetNode.id, targetParamIndex, 'input', targetNode.type)
 
   let x1, y1, x2, y2
 
@@ -318,8 +341,19 @@ const getConnectionPath = (connection) => {
   } else {
     // 回退到计算位置
     const nodeWidth = 220
-    y1 = getNodeParamPortPosition(sourceNode, sourceParamIndex, 'output')
-    x1 = sourceNode.x + nodeWidth
+    // 计算起点：开始节点使用添加按钮位置（right: -14px, width: 18px, center: -5px）
+    // 其他节点使用节点右侧边缘
+    if (sourceNode.type === 'start') {
+      x1 = sourceNode.x + nodeWidth - 5 // 添加按钮中心位置
+      // 开始节点的 Y 位置：节点垂直居中
+      const params = getNodeOutputParams(sourceNode)
+      const paramsHeight = params.length > 0 ? 32 : 0
+      const nodeHeight = 40 + paramsHeight
+      y1 = sourceNode.y + nodeHeight / 2
+    } else {
+      y1 = getNodeParamPortPosition(sourceNode, sourceParamIndex, 'output')
+      x1 = sourceNode.x + nodeWidth
+    }
     y2 = getNodeParamPortPosition(targetNode, targetParamIndex, 'input')
     x2 = targetNode.x
   }
@@ -343,8 +377,8 @@ const getConnectionMidpoint = (connection) => {
   const targetParamIndex = connection.targetParamIndex ?? 0
 
   // 尝试使用 DOM 获取端口实际位置
-  const sourcePortPos = getPortDomPosition(sourceNode.id, sourceParamIndex, 'output')
-  const targetPortPos = getPortDomPosition(targetNode.id, targetParamIndex, 'input')
+  const sourcePortPos = getPortDomPosition(sourceNode.id, sourceParamIndex, 'output', sourceNode.type)
+  const targetPortPos = getPortDomPosition(targetNode.id, targetParamIndex, 'input', targetNode.type)
 
   let x1, y1, x2, y2
 
@@ -356,8 +390,17 @@ const getConnectionMidpoint = (connection) => {
   } else {
     // 回退到计算位置
     const nodeWidth = 220
-    y1 = getNodeParamPortPosition(sourceNode, sourceParamIndex, 'output')
-    x1 = sourceNode.x + nodeWidth
+    // 计算起点：开始节点使用添加按钮位置
+    if (sourceNode.type === 'start') {
+      x1 = sourceNode.x + nodeWidth - 5
+      const params = getNodeOutputParams(sourceNode)
+      const paramsHeight = params.length > 0 ? 32 : 0
+      const nodeHeight = 40 + paramsHeight
+      y1 = sourceNode.y + nodeHeight / 2
+    } else {
+      y1 = getNodeParamPortPosition(sourceNode, sourceParamIndex, 'output')
+      x1 = sourceNode.x + nodeWidth
+    }
     y2 = getNodeParamPortPosition(targetNode, targetParamIndex, 'input')
     x2 = targetNode.x
   }
@@ -404,8 +447,8 @@ const getConnectionPathPart = (connection, part) => {
   const targetParamIndex = connection.targetParamIndex ?? 0
 
   // 尝试使用 DOM 获取端口实际位置
-  const sourcePortPos = getPortDomPosition(sourceNode.id, sourceParamIndex, 'output')
-  const targetPortPos = getPortDomPosition(targetNode.id, targetParamIndex, 'input')
+  const sourcePortPos = getPortDomPosition(sourceNode.id, sourceParamIndex, 'output', sourceNode.type)
+  const targetPortPos = getPortDomPosition(targetNode.id, targetParamIndex, 'input', targetNode.type)
 
   let x1, y1, x2, y2
 
@@ -417,8 +460,17 @@ const getConnectionPathPart = (connection, part) => {
   } else {
     // 回退到计算位置
     const nodeWidth = 220
-    y1 = getNodeParamPortPosition(sourceNode, sourceParamIndex, 'output')
-    x1 = sourceNode.x + nodeWidth
+    // 计算起点：开始节点使用添加按钮位置
+    if (sourceNode.type === 'start') {
+      x1 = sourceNode.x + nodeWidth - 5
+      const params = getNodeOutputParams(sourceNode)
+      const paramsHeight = params.length > 0 ? 32 : 0
+      const nodeHeight = 40 + paramsHeight
+      y1 = sourceNode.y + nodeHeight / 2
+    } else {
+      y1 = getNodeParamPortPosition(sourceNode, sourceParamIndex, 'output')
+      x1 = sourceNode.x + nodeWidth
+    }
     y2 = getNodeParamPortPosition(targetNode, targetParamIndex, 'input')
     x2 = targetNode.x
   }
@@ -1518,14 +1570,15 @@ const handleActionBtnDown = (node, event) => {
   if (outputParams.length === 0) return
 
   const port = outputParams[0]
-  const nodeWidth = 200
+  const nodeWidth = 220
   // 根据节点内容计算实际高度
   const params = getNodeOutputParams(node)
   const paramsHeight = params.length > 0 ? 32 : 0
   const nodeHeight = 40 + paramsHeight // header 40px + 参数区域
 
-  // 计算起点位置 - 节点右侧中间
-  const x = node.x + nodeWidth
+  // 计算起点位置 - 与添加按钮中心重合
+  // 添加按钮 CSS: right: -14px, width: 18px, center = nodeWidth - 14 + 9 = nodeWidth - 5
+  const x = node.x + nodeWidth - 5
   const y = node.y + nodeHeight / 2
 
   longPressState.isLongPress = false
