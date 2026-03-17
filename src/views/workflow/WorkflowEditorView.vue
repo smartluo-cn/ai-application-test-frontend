@@ -1088,7 +1088,7 @@ const connectionMenuDelete = () => {
 }
 
 // 自动调整节点布局
-const autoLayoutNodes = () => {
+const autoLayoutNodes = async () => {
   if (nodes.value.length === 0) return
 
   // 布局参数（根据实际节点样式调整）
@@ -1178,6 +1178,13 @@ const autoLayoutNodes = () => {
       }
     })
   })
+
+  // 等待 DOM 更新后触发连线重新渲染
+  await nextTick()
+  if (connections.value.length > 0) {
+    const temp = [...connections.value]
+    connections.value = temp
+  }
 
   ElMessage.success('布局已调整')
 }
