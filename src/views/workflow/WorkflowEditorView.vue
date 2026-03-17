@@ -1045,7 +1045,7 @@ const getNodeInputParams = (node) => {
       return [{ name: '-', type: '-', isPlaceholder: true }]
     }
     return outputParams.map((param) => ({
-      name: param.name || 'input',
+      name: param.name || '',
       type: param.type || 'String',
     }))
   }
@@ -1095,7 +1095,7 @@ const getNodeOutputParams = (node) => {
       return [{ name: '-', type: '-', isPlaceholder: true }]
     }
     return outputParams.map((param) => ({
-      name: param.name || 'output',
+      name: param.name || '',
       type: param.type || 'String',
     }))
   }
@@ -2021,7 +2021,9 @@ onUnmounted(() => {
                           @mouseup.stop="endConnection(node, param, idx, $event)"
                         ></div>
                       </td>
-                      <td class="param-name-cell">{{ param.name }}</td>
+                      <td class="param-name-cell" :class="{ 'param-name-empty': !param.name }">
+                        {{ param.name || '新建参数' }}
+                      </td>
                       <td class="param-type-cell">{{ param.type }}</td>
                     </tr>
                   </tbody>
@@ -2041,7 +2043,9 @@ onUnmounted(() => {
                       :key="'out-' + idx"
                       class="param-row"
                     >
-                      <td class="param-name-cell">{{ param.name }}</td>
+                      <td class="param-name-cell" :class="{ 'param-name-empty': !param.name }">
+                        {{ param.name || '新建参数' }}
+                      </td>
                       <td class="param-type-cell">{{ param.type }}</td>
                       <!-- 输出端口 -->
                       <td class="param-port-cell output-port-cell">
@@ -2930,6 +2934,12 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.node-params .param-name-cell.param-name-empty {
+  color: #9ca3af;
+  font-style: italic;
+  font-weight: 400;
 }
 
 .node-params .param-type-cell {
