@@ -1512,11 +1512,17 @@ const LONG_PRESS_THRESHOLD = 150
 // 处理按钮按下
 const handleActionBtnDown = (node, event) => {
   event.stopPropagation()
-  if (node.outputs.length === 0) return
 
-  const port = node.outputs[0]
+  // 检查节点是否可以添加连线（开始节点使用 outputParams，其他节点使用 outputs）
+  const outputParams = node.type === 'start' ? (node.outputParams || []) : node.outputs
+  if (outputParams.length === 0) return
+
+  const port = outputParams[0]
   const nodeWidth = 200
-  const nodeHeight = 72
+  // 根据节点内容计算实际高度
+  const params = getNodeOutputParams(node)
+  const paramsHeight = params.length > 0 ? 32 : 0
+  const nodeHeight = 40 + paramsHeight // header 40px + 参数区域
 
   // 计算起点位置 - 节点右侧中间
   const x = node.x + nodeWidth
@@ -2118,6 +2124,14 @@ onUnmounted(() => {
                       {{ param.name || '新建参数' }}
                     </span>
                   </span>
+                </div>
+                <!-- 开始节点右侧的添加/连线按钮 -->
+                <div
+                  class="node-action-btn"
+                  @mousedown.stop="handleActionBtnDown(node, $event)"
+                  @mouseup.stop="handleActionBtnUp(node, $event)"
+                >
+                  <el-icon :size="12"><Plus /></el-icon>
                 </div>
               </template>
 
