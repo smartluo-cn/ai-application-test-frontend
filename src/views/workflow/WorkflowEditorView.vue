@@ -142,7 +142,7 @@ const nodes = ref([
     y: 300,
     inputs: [],
     outputs: [{ id: 'out-1', name: '输出' }],
-    outputParams: [{ name: 'input', type: 'String' }],
+    outputParams: [{ name: 'input', type: 'String', elementType: 'string' }],
     inputParams: [],
     config: {},
   },
@@ -1014,6 +1014,7 @@ const addOutputParam = () => {
   selectedNode.value.outputParams.push({
     name: '',
     type: 'string',
+    elementType: 'string',
     required: false,
   })
 }
@@ -1034,6 +1035,22 @@ const getAvailableVariables = () => {
   }))
 }
 
+// 格式化参数类型显示（数组类型显示元素类型）
+const formatParamType = (param) => {
+  if (!param.type) return 'String'
+  if (param.type === 'array' && param.elementType) {
+    const elementTypes = {
+      string: 'String',
+      number: 'Number',
+      boolean: 'Boolean',
+      object: 'Object',
+    }
+    return `Array<${elementTypes[param.elementType] || 'String'}>`
+  }
+  // 首字母大写
+  return param.type.charAt(0).toUpperCase() + param.type.slice(1)
+}
+
 // 获取节点的输入参数（用于在节点方框中显示）
 const getNodeInputParams = (node) => {
   if (!node) return []
@@ -1046,7 +1063,7 @@ const getNodeInputParams = (node) => {
     }
     return outputParams.map((param) => ({
       name: param.name || '',
-      type: param.type || 'String',
+      type: formatParamType(param),
     }))
   }
 
@@ -1096,7 +1113,7 @@ const getNodeOutputParams = (node) => {
     }
     return outputParams.map((param) => ({
       name: param.name || '',
-      type: param.type || 'String',
+      type: formatParamType(param),
     }))
   }
 
@@ -2379,7 +2396,7 @@ onUnmounted(() => {
                     <el-input v-model="row.name" placeholder="请输入变量名" size="small" />
                   </template>
                 </el-table-column>
-                <el-table-column label="变量类型" min-width="140">
+                <el-table-column label="变量类型" min-width="120">
                   <template #default="{ row }">
                     <el-select v-model="row.type" placeholder="选择类型" size="small" style="width: 100%">
                       <el-option label="String" value="string" />
@@ -2388,6 +2405,23 @@ onUnmounted(() => {
                       <el-option label="Object" value="object" />
                       <el-option label="Array" value="array" />
                     </el-select>
+                  </template>
+                </el-table-column>
+                <el-table-column label="元素类型" min-width="120">
+                  <template #default="{ row }">
+                    <el-select
+                      v-if="row.type === 'array'"
+                      v-model="row.elementType"
+                      placeholder="选择元素类型"
+                      size="small"
+                      style="width: 100%"
+                    >
+                      <el-option label="String" value="string" />
+                      <el-option label="Number" value="number" />
+                      <el-option label="Boolean" value="boolean" />
+                      <el-option label="Object" value="object" />
+                    </el-select>
+                    <span v-else class="element-type-placeholder">-</span>
                   </template>
                 </el-table-column>
                 <el-table-column label="必填" width="80" align="center">
@@ -3906,6 +3940,13 @@ onUnmounted(() => {
 
 .config-item-header label {
   margin-bottom: 0;
+}
+
+/* 元素类型占位符样式 */
+.element-type-placeholder {
+  color: #9ca3af;
+  text-align: center;
+  display: block;
 }
 
 /* 输入参数定义样式 */
