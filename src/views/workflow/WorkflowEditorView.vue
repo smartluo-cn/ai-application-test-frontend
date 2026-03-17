@@ -40,6 +40,7 @@ import {
   Grid,
   Upload,
   Tools,
+  QuestionFilled,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -107,6 +108,11 @@ const nodeTypes = [
   { type: 'reportGenerate', name: '生成报告', icon: 'DocumentAdd', color: '#10b981', category: 'report' },
   { type: 'reportAnalysis', name: '报告分析', icon: 'TrendCharts', color: '#0ea5e9', category: 'report' },
 ]
+
+// 节点功能描述映射
+const nodeDescriptions = {
+  textClean: '对文本数据进行清洗、过滤和标准化处理',
+}
 
 // 变量类型级联选择器数据
 const typeOptions = [
@@ -190,10 +196,50 @@ const nodes = ref([
     config: {},
   },
   {
+    id: 'textClean-1',
+    type: 'textClean',
+    name: '文本清洗',
+    x: 380,
+    y: 300,
+    inputs: [{ id: 'in-tc-1', name: '输入' }],
+    outputs: [{ id: 'out-tc-1', name: '输出' }],
+    config: {},
+  },
+  {
+    id: 'envConnect-1',
+    type: 'envConnect',
+    name: '环境对接',
+    x: 660,
+    y: 300,
+    inputs: [{ id: 'in-env-1', name: '输入' }],
+    outputs: [{ id: 'out-env-1', name: '输出' }],
+    config: {},
+  },
+  {
+    id: 'apiAuto-1',
+    type: 'apiAuto',
+    name: '接口自动化',
+    x: 940,
+    y: 300,
+    inputs: [{ id: 'in-api-1', name: '输入' }],
+    outputs: [{ id: 'out-api-1', name: '输出' }],
+    config: {},
+  },
+  {
+    id: 'judgeModel-1',
+    type: 'judgeModel',
+    name: '裁判模型',
+    x: 1220,
+    y: 300,
+    inputs: [{ id: 'in-jm-1', name: '输入' }],
+    outputs: [{ id: 'out-jm-1', name: '输出' }],
+    config: {},
+  },
+  {
     id: 'end-1',
     type: 'end',
     name: '结束',
-    x: 450,
+    x: 1500,
     y: 300,
     inputs: [{ id: 'in-1', name: '输入' }],
     outputs: [],
@@ -203,7 +249,11 @@ const nodes = ref([
 
 // 连线列表
 const connections = ref([
-  { id: 'conn-1', sourceId: 'start-1', sourcePort: 'out-1', targetId: 'end-1', targetPort: 'in-1', sourceParamIndex: 0, targetParamIndex: 0 },
+  { id: 'conn-1', sourceId: 'start-1', sourcePort: 'out-1', targetId: 'textClean-1', targetPort: 'in-tc-1', sourceParamIndex: 0, targetParamIndex: 0 },
+  { id: 'conn-2', sourceId: 'textClean-1', sourcePort: 'out-tc-1', targetId: 'envConnect-1', targetPort: 'in-env-1', sourceParamIndex: 0, targetParamIndex: 0 },
+  { id: 'conn-3', sourceId: 'envConnect-1', sourcePort: 'out-env-1', targetId: 'apiAuto-1', targetPort: 'in-api-1', sourceParamIndex: 0, targetParamIndex: 0 },
+  { id: 'conn-4', sourceId: 'apiAuto-1', sourcePort: 'out-api-1', targetId: 'judgeModel-1', targetPort: 'in-jm-1', sourceParamIndex: 0, targetParamIndex: 0 },
+  { id: 'conn-5', sourceId: 'judgeModel-1', sourcePort: 'out-jm-1', targetId: 'end-1', targetPort: 'in-1', sourceParamIndex: 0, targetParamIndex: 0 },
 ])
 
 // 选中的节点
@@ -1202,13 +1252,50 @@ const getNodeInputParams = (node) => {
     }))
   }
 
-  // 文本清洗节点：根据配置确定输入参数
+  // 文本清洗节点：输入参数
   if (node.type === 'textClean') {
-    const inputType = node.config?.inputType || 'text'
     return [
       {
-        name: 'input',
-        type: inputType === 'text' ? 'String' : 'Dataset',
+        name: 'input_file',
+        type: 'File',
+        required: true,
+        description: '需要被清洗的目标xlsx文件',
+      },
+      {
+        name: 'cols',
+        type: 'String',
+        required: true,
+        description: '指定xlsx文件中需要清洗的列（英文逗号分隔）',
+      },
+      {
+        name: 'remove_extra_spaces',
+        type: 'Boolean',
+        required: false,
+        description: '是否去除多余空格',
+      },
+      {
+        name: 'remove_html_tags',
+        type: 'Boolean',
+        required: false,
+        description: '是否去除HTML标签',
+      },
+      {
+        name: 'remove_special_chars',
+        type: 'Boolean',
+        required: false,
+        description: '是否去除特殊字符',
+      },
+      {
+        name: 'standardized_newline_char',
+        type: 'Boolean',
+        required: false,
+        description: '是否标准化换行符',
+      },
+      {
+        name: 'trim_front_back',
+        type: 'Boolean',
+        required: false,
+        description: '是否去除首尾空白',
       },
     ]
   }
@@ -1261,13 +1348,13 @@ const getNodeOutputParams = (node) => {
     return inputParams
   }
 
-  // 文本清洗节点：根据输入类型确定输出
+  // 文本清洗节点：输出参数为 output_file
   if (node.type === 'textClean') {
-    const inputType = node.config?.inputType || 'text'
     return [
       {
-        name: 'output',
-        type: inputType === 'text' ? 'String' : 'JSON Array',
+        name: 'output_file',
+        type: 'File',
+        description: '被清洗之后的xlsx文件',
       },
     ]
   }
@@ -2160,6 +2247,11 @@ onUnmounted(() => {
                 <span class="node-name">{{ node.name }}</span>
               </div>
 
+              <!-- 节点功能描述 -->
+              <div v-if="nodeDescriptions[node.type]" class="node-description">
+                {{ nodeDescriptions[node.type] }}
+              </div>
+
               <!-- 开始节点：单行显示输入参数 -->
               <template v-if="node.type === 'start'">
                 <div
@@ -2211,65 +2303,55 @@ onUnmounted(() => {
 
               <!-- 其他节点：分别显示输入和输出参数 -->
               <template v-else>
-                <!-- 输入参数表格 -->
+                <!-- 输入端口在节点左侧边缘垂直居中 -->
+                <div
+                  class="input-port node-edge-port node-center-port"
+                  title="input"
+                  @mouseup.stop="endConnection(node, null, 0, $event)"
+                ></div>
+
+                <!-- 输入参数：单行显示 -->
                 <div
                   v-if="getNodeInputParams(node).length > 0"
-                  class="node-params input-params"
+                  class="node-params inline-params input-inline-params"
                 >
-                  <div class="params-label">输入</div>
-                  <table class="params-table">
-                    <tbody>
-                      <tr
-                        v-for="(param, idx) in getNodeInputParams(node)"
-                        :key="'in-' + idx"
-                        class="param-row"
-                      >
-                        <!-- 输入端口在左边 -->
-                        <td class="param-port-cell input-port-cell">
-                          <div
-                            class="input-port"
-                            :title="param.name"
-                            @mouseup.stop="endConnection(node, param, idx, $event)"
-                          ></div>
-                        </td>
-                        <td class="param-name-cell" :class="{ 'param-name-empty': !param.name }">
-                          {{ param.name || '新建参数' }}
-                        </td>
-                        <td class="param-type-cell">{{ param.type }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  <span class="params-label">输入</span>
+                  <span class="params-inline-list">
+                    <span
+                      v-for="(param, idx) in getNodeInputParams(node)"
+                      :key="'in-' + idx"
+                      class="param-inline-item"
+                      :title="param.name + ': ' + param.type"
+                    >
+                      {{ param.name || '新建参数' }}
+                    </span>
+                  </span>
                 </div>
 
-                <!-- 输出参数表格 -->
+                <!-- 输出参数：单行显示 -->
                 <div
                   v-if="getNodeOutputParams(node).length > 0"
-                  class="node-params output-params"
+                  class="node-params inline-params output-inline-params"
                 >
-                  <div class="params-label">输出</div>
-                  <table class="params-table">
-                    <tbody>
-                      <tr
-                        v-for="(param, idx) in getNodeOutputParams(node)"
-                        :key="'out-' + idx"
-                        class="param-row"
-                      >
-                        <td class="param-name-cell" :class="{ 'param-name-empty': !param.name }">
-                          {{ param.name || '新建参数' }}
-                        </td>
-                        <td class="param-type-cell">{{ param.type }}</td>
-                        <!-- 输出端口 -->
-                        <td class="param-port-cell output-port-cell">
-                          <div
-                            class="output-port"
-                            :title="param.name"
-                            @mousedown.stop="startConnectionFromOutput(node, param, idx, $event)"
-                          ></div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  <span class="params-label">输出</span>
+                  <span class="params-inline-list">
+                    <span
+                      v-for="(param, idx) in getNodeOutputParams(node)"
+                      :key="'out-' + idx"
+                      class="param-inline-item"
+                      :title="param.name + ': ' + param.type"
+                    >
+                      {{ param.name || '新建参数' }}
+                    </span>
+                  </span>
                 </div>
+
+                <!-- 输出端口在节点右侧边缘垂直居中 -->
+                <div
+                  class="output-port node-edge-port node-center-port"
+                  title="output"
+                  @mousedown.stop="startConnectionFromOutput(node, null, 0, $event)"
+                ></div>
               </template>
             </div>
           </div>
@@ -2741,172 +2823,88 @@ onUnmounted(() => {
 
           <!-- 文本清洗节点配置 -->
           <template v-if="selectedNode.type === 'textClean'">
-            <div class="config-item">
-              <label>输入类型</label>
-              <el-radio-group v-model="selectedNode.config.inputType" class="input-type-radio">
-                <el-radio value="text">直接输入文本</el-radio>
-                <el-radio value="dataset">关联测评集</el-radio>
-              </el-radio-group>
-            </div>
-
-            <!-- 输入参数定义 -->
-            <div class="config-item">
-              <div class="config-item-header">
-                <label>输入参数</label>
+            <!-- 输入参数 -->
+            <div class="io-section">
+              <div class="io-section-header">
+                <el-icon class="expand-icon"><ArrowDown /></el-icon>
+                <span class="io-section-title">输入</span>
               </div>
-              <div class="input-params-definition">
-                <div class="param-item">
-                  <span class="param-name">input</span>
-                  <span v-if="selectedNode.config.inputType === 'text'" class="param-type">
-                    String
-                  </span>
-                  <span v-else class="param-type">Dataset</span>
-                </div>
-                <div v-if="selectedNode.config.inputType === 'text'" class="param-desc">
-                  需要清洗的文本内容
-                </div>
-                <div v-else class="param-desc">
-                  需要清洗的测评集数据
-                </div>
-              </div>
-            </div>
-
-            <!-- 直接输入文本 -->
-            <div v-if="selectedNode.config.inputType === 'text'" class="config-item">
-              <label>输入文本</label>
-              <el-input
-                v-model="selectedNode.config.textContent"
-                type="textarea"
-                :rows="6"
-                placeholder="请输入需要清洗的文本内容"
-              />
-            </div>
-
-            <!-- 关联测评集 -->
-            <div v-if="selectedNode.config.inputType === 'dataset'" class="config-item">
-              <label>选择测评集</label>
-              <el-select
-                v-model="selectedNode.config.datasetId"
-                placeholder="请选择测评集"
-                style="width: 100%"
-                @change="onDatasetChange"
-              >
-                <el-option
-                  v-for="dataset in datasetList"
-                  :key="dataset.id"
-                  :label="dataset.name"
-                  :value="dataset.id"
-                />
-              </el-select>
-            </div>
-
-            <div
-              v-if="selectedNode.config.inputType === 'dataset' && selectedNode.config.datasetId"
-              class="config-item"
-            >
-              <label>选择字段（可多选）</label>
-              <el-select
-                v-model="selectedNode.config.datasetFields"
-                multiple
-                collapse-tags
-                collapse-tags-tooltip
-                placeholder="请选择要清洗的字段"
-                style="width: 100%"
-              >
-                <el-option
-                  v-for="field in getDatasetFields()"
-                  :key="field.key"
-                  :label="field.label"
-                  :value="field.key"
-                />
-              </el-select>
-              <div v-if="getSelectedDataset()" class="dataset-info">
-                <el-icon :size="14" color="#909399"><Document /></el-icon>
-                <span>已选择：{{ getSelectedDataset()?.name }}</span>
-                <span v-if="selectedNode.config.datasetFields?.length > 0" class="field-count">
-                  （已选 {{ selectedNode.config.datasetFields.length }} 个字段）
-                </span>
+              <div class="io-section-content">
+                <el-table
+                  :data="[
+                    { name: 'input_file', type: 'File', required: true, desc: '需要被清洗的目标xlsx文件', field: 'inputFileValue', inputType: 'text' },
+                    { name: 'cols', type: 'String', required: true, desc: '指定xlsx文件中需要清洗的列（英文逗号分隔）', field: 'colsValue', inputType: 'text' },
+                    { name: 'remove_extra_spaces', type: 'Boolean', required: false, desc: '是否去除多余空格', field: 'removeExtraSpaces', inputType: 'boolean' },
+                    { name: 'remove_html_tags', type: 'Boolean', required: false, desc: '是否去除HTML标签', field: 'removeHtmlTags', inputType: 'boolean' },
+                    { name: 'remove_special_chars', type: 'Boolean', required: false, desc: '是否去除特殊字符', field: 'removeSpecialChars', inputType: 'boolean' },
+                    { name: 'standardized_newline_char', type: 'Boolean', required: false, desc: '是否标准化换行符', field: 'standardizedNewlineChar', inputType: 'boolean' },
+                    { name: 'trim_front_back', type: 'Boolean', required: false, desc: '是否去除首尾空白', field: 'trimFrontBack', inputType: 'boolean' }
+                  ]"
+                  size="small"
+                  class="io-table"
+                >
+                  <el-table-column label="变量名" min-width="180">
+                    <template #default="{ row }">
+                      <div class="param-name-cell">
+                        <span v-if="row.required" class="required-mark">*</span>
+                        <span class="param-name-text">{{ row.name }}</span>
+                        <el-tooltip :content="row.desc" placement="top" :show-after="300">
+                          <el-icon class="param-desc-icon"><QuestionFilled /></el-icon>
+                        </el-tooltip>
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="类型" width="100" align="center">
+                    <template #default="{ row }">
+                      <span class="param-type-tag">{{ row.type }}</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="变量值" min-width="120" align="center">
+                    <template #default="{ row }">
+                      <el-input
+                        v-if="row.inputType === 'text'"
+                        v-model="selectedNode.config[row.field]"
+                        placeholder="输入或引用参数值"
+                        size="small"
+                      />
+                      <el-switch
+                        v-else-if="row.inputType === 'boolean'"
+                        v-model="selectedNode.config[row.field]"
+                      />
+                    </template>
+                  </el-table-column>
+                </el-table>
               </div>
             </div>
 
-            <!-- 输出预览 -->
-            <div class="config-item output-preview">
-              <div class="config-item-header">
-                <label>输出预览</label>
+            <!-- 输出参数 -->
+            <div class="io-section">
+              <div class="io-section-header">
+                <el-icon class="expand-icon"><ArrowDown /></el-icon>
+                <span class="io-section-title">输出</span>
               </div>
-              <div class="preview-content">
-                <pre class="preview-code">{{ getOutputFormatPreview() }}</pre>
-              </div>
-            </div>
-
-            <!-- 输出参数定义 -->
-            <div class="config-item">
-              <div class="config-item-header">
-                <label>输出参数定义</label>
-                <span class="auto-hint">（根据输入类型自动确定）</span>
-              </div>
-
-              <!-- 文本输入时的输出参数 -->
-              <div v-if="selectedNode.config.inputType === 'text'" class="output-params-definition">
-                <div class="param-item">
-                  <span class="param-name">output</span>
-                  <span class="param-type">String</span>
-                </div>
-                <div class="param-desc">
-                  清洗后的文本内容，返回字符串类型
-                </div>
-              </div>
-
-              <!-- 测评集输入时的输出参数 -->
-              <div v-if="selectedNode.config.inputType === 'dataset'" class="output-params-definition">
-                <div class="param-item">
-                  <span class="param-name">output</span>
-                  <span class="param-type">JSON Array</span>
-                </div>
-                <div class="param-desc">
-                  清洗后的数据数组，每个数组元素包含以下字段：
-                </div>
-                <div class="param-fields">
-                  <div class="field-item">
-                    <span class="field-name">field</span>
-                    <span class="field-type">String</span>
-                    <span class="field-desc">字段名称</span>
-                  </div>
-                  <div class="field-item">
-                    <span class="field-name">originalContent</span>
-                    <span class="field-type">String</span>
-                    <span class="field-desc">清洗前的内容</span>
-                  </div>
-                  <div class="field-item">
-                    <span class="field-name">cleanedContent</span>
-                    <span class="field-type">String</span>
-                    <span class="field-desc">清洗后的内容</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 清洗规则配置 -->
-            <div class="config-item">
-              <div class="config-item-header">
-                <label>清洗规则</label>
-              </div>
-              <div class="clean-rules">
-                <el-checkbox v-model="selectedNode.config.removeExtraSpaces">
-                  去除多余空格
-                </el-checkbox>
-                <el-checkbox v-model="selectedNode.config.removeHtmlTags">
-                  去除HTML标签
-                </el-checkbox>
-                <el-checkbox v-model="selectedNode.config.removeSpecialChars">
-                  去除特殊字符
-                </el-checkbox>
-                <el-checkbox v-model="selectedNode.config.normalizeNewlines">
-                  标准化换行符
-                </el-checkbox>
-                <el-checkbox v-model="selectedNode.config.trimWhitespace">
-                  去除首尾空白
-                </el-checkbox>
+              <div class="io-section-content">
+                <el-table
+                  :data="[{ name: 'output_file', type: 'File', desc: '被清洗之后的xlsx文件' }]"
+                  size="small"
+                  class="io-table"
+                >
+                  <el-table-column label="变量名" min-width="160">
+                    <template #default="{ row }">
+                      <div class="param-name-cell">
+                        <span class="param-name-text">{{ row.name }}</span>
+                        <el-tooltip :content="row.desc" placement="top" :show-after="300">
+                          <el-icon class="param-desc-icon"><QuestionFilled /></el-icon>
+                        </el-tooltip>
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="类型" width="100" align="center">
+                    <template #default="{ row }">
+                      <span class="param-type-tag">{{ row.type }}</span>
+                    </template>
+                  </el-table-column>
+                </el-table>
               </div>
             </div>
           </template>
@@ -3116,6 +3114,14 @@ onUnmounted(() => {
   gap: 10px;
 }
 
+.node-description {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 4px;
+  line-height: 1.4;
+  padding: 0 2px;
+}
+
 .node-icon {
   width: 28px;
   height: 28px;
@@ -3223,7 +3229,6 @@ onUnmounted(() => {
 }
 
 .node-params.inline-params .params-label {
-  color: #10b981;
   flex-shrink: 0;
 }
 
@@ -3239,11 +3244,78 @@ onUnmounted(() => {
 .node-params.inline-params .param-inline-item {
   flex-shrink: 0;
   padding: 2px 6px;
-  background: #ecfdf5;
-  color: #10b981;
   font-size: 10px;
   border-radius: 3px;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+}
+
+/* 输入参数样式 - 紫色 */
+.node-params.inline-params.input-inline-params .params-label {
+  color: #6366f1;
+}
+
+.node-params.inline-params.input-inline-params .param-inline-item {
+  background: #eef2ff;
+  color: #6366f1;
+}
+
+/* 输出参数样式 - 绿色 */
+.node-params.inline-params.output-inline-params .params-label {
+  color: #10b981;
+}
+
+.node-params.inline-params.output-inline-params .param-inline-item {
+  background: #ecfdf5;
+  color: #10b981;
+}
+
+/* 开始节点输入参数样式 - 紫色 */
+.node-params.inline-params:not(.input-inline-params):not(.output-inline-params):not(.end-inline-params) .params-label {
+  color: #6366f1;
+}
+
+.node-params.inline-params:not(.input-inline-params):not(.output-inline-params):not(.end-inline-params) .param-inline-item {
+  background: #eef2ff;
+  color: #6366f1;
+}
+
+/* 结束节点输出参数样式 - 绿色 */
+.node-params.inline-params.end-inline-params .params-label {
+  color: #10b981;
+}
+
+.node-params.inline-params.end-inline-params .param-inline-item {
+  background: #ecfdf5;
+  color: #10b981;
+}
+
+/* 内联端口样式 */
+.param-inline-item .inline-port {
+  position: relative !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  transform: none !important;
+  width: 8px !important;
+  height: 8px !important;
+  flex-shrink: 0;
+}
+
+.param-inline-item .inline-port.input-port {
+  left: auto !important;
+}
+
+.param-inline-item .inline-port.output-port {
+  position: relative !important;
+  right: auto !important;
+}
+
+.param-inline-item .inline-port:hover {
+  transform: scale(1.2) !important;
 }
 
 /* 输入端口样式 */
@@ -3316,6 +3388,28 @@ onUnmounted(() => {
   background: #22d3ee;
   transform: translateY(-50%) scale(1.2);
   box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+}
+
+/* 节点边缘端口样式（用于其他节点的输入/输出端口） */
+.node-edge-port.input-port {
+  position: absolute;
+  left: -6px;
+  transform: translateY(-50%);
+}
+
+.node-edge-port.output-port {
+  position: absolute;
+  right: -6px;
+  transform: translateY(-50%);
+}
+
+.node-edge-port:hover {
+  transform: translateY(-50%) scale(1.2);
+}
+
+/* 节点垂直居中端口样式 */
+.node-center-port {
+  top: 50% !important;
 }
 
 /* 结束节点单行参数样式 - 标签使用红色 */
@@ -4260,5 +4354,154 @@ onUnmounted(() => {
 .field-desc {
   font-size: 12px;
   color: #6b7280;
+}
+
+/* IO Section 样式 */
+.io-section {
+  margin-bottom: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.io-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #f9fafb;
+  cursor: pointer;
+  user-select: none;
+}
+
+.io-section-header:hover {
+  background: #f3f4f6;
+}
+
+.expand-icon {
+  color: #9ca3af;
+  font-size: 12px;
+  transition: transform 0.2s;
+}
+
+.io-section-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.io-section-content {
+  padding: 12px 16px;
+  background: #fff;
+}
+
+.io-param-item {
+  margin-bottom: 16px;
+}
+
+.io-param-item:last-child {
+  margin-bottom: 0;
+}
+
+.io-param-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.io-param-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1f2937;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.io-param-name .required-mark {
+  color: #ef4444;
+  margin-left: 2px;
+}
+
+.io-param-type {
+  font-size: 12px;
+  color: #6b7280;
+  padding: 2px 8px;
+  background: #f3f4f6;
+  border-radius: 4px;
+}
+
+.io-param-desc {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-bottom: 8px;
+}
+
+.io-param-input {
+  margin-top: 8px;
+}
+
+.io-param-input .el-input__wrapper {
+  background: #fff;
+}
+
+/* IO 表格样式 - 无边框表格 */
+.io-table {
+  --el-table-border-color: transparent;
+}
+
+.io-table .el-table__inner-wrapper::before {
+  display: none;
+}
+
+.io-table .el-table__header-wrapper th {
+  background: #f9fafb;
+  font-weight: 500;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.io-table .el-table__body tr:hover > td {
+  background: #f9fafb;
+}
+
+.io-table .el-table__body td {
+  padding: 10px 0;
+}
+
+.param-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.param-name-cell .required-mark {
+  color: #ef4444;
+  font-weight: 500;
+}
+
+.param-name-cell .param-name-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1f2937;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.param-name-cell .param-desc-icon {
+  color: #9ca3af;
+  cursor: pointer;
+  font-size: 14px;
+  transition: color 0.2s;
+}
+
+.param-name-cell .param-desc-icon:hover {
+  color: #6366f1;
+}
+
+.param-type-tag {
+  font-size: 12px;
+  color: #6b7280;
+  padding: 2px 10px;
+  background: #f3f4f6;
+  border-radius: 4px;
 }
 </style>
