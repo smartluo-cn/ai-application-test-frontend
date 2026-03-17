@@ -41,7 +41,11 @@ import {
   Upload,
   Tools,
   QuestionFilled,
+  ArrowUp,
+  ArrowDown,
+  Position,
 } from '@element-plus/icons-vue'
+import AiChat from '@/components/chat/AiChat.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -762,6 +766,102 @@ const debugState = reactive({
   logs: [],
 })
 
+// AI聊天框状态
+const aiChatExpanded = ref(false)
+const aiChatMessages = ref([
+  {
+    id: 1,
+    type: 'ai',
+    content: '你好！我是工作流AI助手，有什么可以帮助你的吗？',
+    time: new Date(),
+  },
+])
+const aiChatInput = ref('')
+const aiChatIsTyping = ref(false)
+const aiChatMessagesRef = ref(null)
+
+// 切换AI聊天框展开/折叠
+const toggleAiChat = () => {
+  aiChatExpanded.value = !aiChatExpanded.value
+}
+
+// 预设的AI回复
+const aiReplies = [
+  '这是一个很好的问题！让我来帮你分析一下。',
+  '我理解你的需求。根据你的描述，我建议...',
+  '好的，我已经收到你的消息了。请问还有什么需要补充的吗？',
+  '这个问题很有趣！从技术角度来看...',
+  '感谢你的提问。我可以为你提供以下建议...',
+  '明白了，让我帮你处理这个需求。',
+]
+
+// 发送AI消息
+const sendAiMessage = async () => {
+  const content = aiChatInput.value.trim()
+  if (!content) return
+
+  const userMessage = {
+    id: Date.now(),
+    type: 'user',
+    content,
+    time: new Date(),
+  }
+  aiChatMessages.value.push(userMessage)
+  aiChatInput.value = ''
+
+  await nextTick()
+  scrollAiChatToBottom()
+
+  aiChatIsTyping.value = true
+
+  setTimeout(async () => {
+    aiChatIsTyping.value = false
+    const aiMessage = {
+      id: Date.now() + 1,
+      type: 'ai',
+      content: aiReplies[Math.floor(Math.random() * aiReplies.length)],
+      time: new Date(),
+    }
+    aiChatMessages.value.push(aiMessage)
+    await nextTick()
+    scrollAiChatToBottom()
+  }, 1000 + Math.random() * 1000)
+}
+
+// 滚动AI聊天到底部
+const scrollAiChatToBottom = () => {
+  if (aiChatMessagesRef.value) {
+    aiChatMessagesRef.value.scrollTop = aiChatMessagesRef.value.scrollHeight
+  }
+}
+
+// 格式化AI聊天时间
+const formatAiChatTime = (date) => {
+  const hours = date.getHours().toString().padStart(2, '0')
+  const minutes = date.getMinutes().toString().padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
+// 清空AI聊天记录
+const clearAiChat = () => {
+  aiChatMessages.value = [
+    {
+      id: Date.now(),
+      type: 'ai',
+      content: '对话已清空，有什么新问题吗？',
+      time: new Date(),
+    },
+  ]
+}
+
+// 处理AI聊天输入回车
+const handleAiChatKeydown = (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    sendAiMessage()
+  }
+}
+
 // 调试节点
 const debugNode = () => {
   if (!selectedNode.value) return
@@ -991,11 +1091,11 @@ const connectionMenuDelete = () => {
 const autoLayoutNodes = () => {
   if (nodes.value.length === 0) return
 
-  // 布局参数
-  const nodeWidth = 200
-  const nodeHeight = 72
-  const horizontalGap = 80
-  const verticalGap = 50
+  // 布局参数（根据实际节点样式调整）
+  const nodeWidth = 220 // 节点实际宽度
+  const nodeHeight = 100 // 节点平均高度（动态高度的估算值）
+  const horizontalGap = 100 // 水平间距
+  const verticalGap = 60 // 垂直间距
   const startX = 100
   const startY = 100
 
@@ -1571,6 +1671,79 @@ const datasetList = ref([
     ],
   },
 ])
+
+// 当前正在选择变量的字段
+const variableSelectorField = ref(null)
+const showVariableSelectorDialog = ref(false)
+
+// 处理文件上传
+const handleFileUpload = (file, field) => {
+  if (!selectedNode.value) return false
+
+  // 检查文件类型
+  const isValidType = file.name.endsWith('.xlsx') || file.name.endsWith('.xls')
+  if (!isValidType) {
+    ElMessage.warning('请上传 xlsx 或 xls 格式的文件')
+    return false
+  }
+
+  // 模拟上传，将文件名存储到配置中
+  selectedNode.value.config[field] = file.name
+  ElMessage.success(`文件 ${file.name} 已选择`)
+  return false // 阻止自动上传
+}
+
+// 显示变量选择器
+const showVariableSelector = (field) => {
+  variableSelectorField.value = field
+  showVariableSelectorDialog.value = true
+}
+
+// 获取前置节点的输出变量列表
+const getUpstreamNodeOutputs = () => {
+  if (!selectedNode.value) return []
+
+  const outputs = []
+  const visitedNodes = new Set()
+
+  // 递归获取所有前置节点
+  const findUpstreamNodes = (nodeId) => {
+    if (visitedNodes.has(nodeId)) return
+    visitedNodes.add(nodeId)
+
+    // 找到连接到当前节点的连线
+    const incomingConns = connections.value.filter((c) => c.targetId === nodeId)
+    incomingConns.forEach((conn) => {
+      const sourceNode = nodes.value.find((n) => n.id === conn.sourceId)
+      if (sourceNode && !visitedNodes.has(sourceNode.id)) {
+        // 获取该节点的输出参数
+        const nodeOutputs = getNodeOutputParams(sourceNode)
+        nodeOutputs.forEach((param) => {
+          outputs.push({
+            nodeId: sourceNode.id,
+            nodeName: sourceNode.name,
+            param: param.name,
+            type: param.type,
+            variable: `\${${sourceNode.name}.${param.name}}`,
+          })
+        })
+        // 继续向上查找
+        findUpstreamNodes(sourceNode.id)
+      }
+    })
+  }
+
+  findUpstreamNodes(selectedNode.value.id)
+  return outputs
+}
+
+// 选择变量
+const selectVariable = (variable) => {
+  if (!selectedNode.value || !variableSelectorField.value) return
+  selectedNode.value.config[variableSelectorField.value] = variable
+  showVariableSelectorDialog.value = false
+  variableSelectorField.value = null
+}
 
 // 初始化文本清洗节点配置
 const initTextCleanConfig = () => {
@@ -2247,11 +2420,6 @@ onUnmounted(() => {
                 <span class="node-name">{{ node.name }}</span>
               </div>
 
-              <!-- 节点功能描述 -->
-              <div v-if="nodeDescriptions[node.type]" class="node-description">
-                {{ nodeDescriptions[node.type] }}
-              </div>
-
               <!-- 开始节点：单行显示输入参数 -->
               <template v-if="node.type === 'start'">
                 <div
@@ -2573,6 +2741,62 @@ onUnmounted(() => {
             </div>
           </div>
         </div>
+
+        <!-- AI助手面板 -->
+        <div class="ai-chat-panel" :class="{ expanded: aiChatExpanded }">
+          <div class="ai-chat-header" @click="toggleAiChat">
+            <div class="ai-chat-title">
+              <el-icon :size="16" color="#6366f1"><ChatDotRound /></el-icon>
+              <span>AI 智能助手</span>
+            </div>
+            <el-icon class="expand-icon" :class="{ expanded: aiChatExpanded }">
+              <ArrowUp v-if="aiChatExpanded" />
+              <ArrowDown v-else />
+            </el-icon>
+          </div>
+          <div v-show="aiChatExpanded" class="ai-chat-content">
+            <div ref="aiChatMessagesRef" class="ai-chat-messages">
+              <div
+                v-for="message in aiChatMessages"
+                :key="message.id"
+                class="ai-message-item"
+                :class="message.type"
+              >
+                <div v-if="message.type === 'ai'" class="ai-message-avatar">
+                  <el-icon :size="14"><ChatDotRound /></el-icon>
+                </div>
+                <div class="ai-message-bubble">{{ message.content }}</div>
+                <div v-if="message.type === 'user'" class="ai-message-avatar user">
+                  <span>我</span>
+                </div>
+              </div>
+              <!-- 正在输入提示 -->
+              <div v-if="aiChatIsTyping" class="ai-message-item ai">
+                <div class="ai-message-avatar">
+                  <el-icon :size="14"><ChatDotRound /></el-icon>
+                </div>
+                <div class="ai-message-bubble typing">
+                  <span class="typing-dot"></span>
+                  <span class="typing-dot"></span>
+                  <span class="typing-dot"></span>
+                </div>
+              </div>
+            </div>
+            <div class="ai-chat-input-area">
+              <el-input
+                v-model="aiChatInput"
+                placeholder="输入消息，按 Enter 发送..."
+                size="small"
+                @keydown.enter.prevent="sendAiMessage"
+              >
+                <template #suffix>
+                  <el-icon class="send-icon" @click="sendAiMessage"><Position /></el-icon>
+                </template>
+              </el-input>
+              <el-button text size="small" @click="clearAiChat">清空</el-button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- 右侧配置面板 -->
@@ -2580,6 +2804,9 @@ onUnmounted(() => {
         <div class="panel-header">
           <div class="panel-title-area">
             <span class="panel-node-name">{{ selectedNode.name }}</span>
+            <span v-if="nodeDescriptions[selectedNode.type]" class="panel-node-desc">
+              {{ nodeDescriptions[selectedNode.type] }}
+            </span>
           </div>
           <div v-if="!['start', 'end'].includes(selectedNode.type)" class="panel-actions">
             <el-button text :icon="Tools" @click="debugNode" title="调试">调试</el-button>
@@ -2832,13 +3059,13 @@ onUnmounted(() => {
               <div class="io-section-content">
                 <el-table
                   :data="[
-                    { name: 'input_file', type: 'File', required: true, desc: '需要被清洗的目标xlsx文件', field: 'inputFileValue', inputType: 'text' },
-                    { name: 'cols', type: 'String', required: true, desc: '指定xlsx文件中需要清洗的列（英文逗号分隔）', field: 'colsValue', inputType: 'text' },
-                    { name: 'remove_extra_spaces', type: 'Boolean', required: false, desc: '是否去除多余空格', field: 'removeExtraSpaces', inputType: 'boolean' },
-                    { name: 'remove_html_tags', type: 'Boolean', required: false, desc: '是否去除HTML标签', field: 'removeHtmlTags', inputType: 'boolean' },
-                    { name: 'remove_special_chars', type: 'Boolean', required: false, desc: '是否去除特殊字符', field: 'removeSpecialChars', inputType: 'boolean' },
-                    { name: 'standardized_newline_char', type: 'Boolean', required: false, desc: '是否标准化换行符', field: 'standardizedNewlineChar', inputType: 'boolean' },
-                    { name: 'trim_front_back', type: 'Boolean', required: false, desc: '是否去除首尾空白', field: 'trimFrontBack', inputType: 'boolean' }
+                    { name: 'input_file', type: 'File', required: true, desc: '需要被清洗的目标xlsx文件', field: 'inputFileValue' },
+                    { name: 'cols', type: 'String', required: true, desc: '指定xlsx文件中需要清洗的列（英文逗号分隔）', field: 'colsValue' },
+                    { name: 'remove_extra_spaces', type: 'Boolean', required: false, desc: '是否去除多余空格', field: 'removeExtraSpaces' },
+                    { name: 'remove_html_tags', type: 'Boolean', required: false, desc: '是否去除HTML标签', field: 'removeHtmlTags' },
+                    { name: 'remove_special_chars', type: 'Boolean', required: false, desc: '是否去除特殊字符', field: 'removeSpecialChars' },
+                    { name: 'standardized_newline_char', type: 'Boolean', required: false, desc: '是否标准化换行符', field: 'standardizedNewlineChar' },
+                    { name: 'trim_front_back', type: 'Boolean', required: false, desc: '是否去除首尾空白', field: 'trimFrontBack' }
                   ]"
                   size="small"
                   class="io-table"
@@ -2859,18 +3086,50 @@ onUnmounted(() => {
                       <span class="param-type-tag">{{ row.type }}</span>
                     </template>
                   </el-table-column>
-                  <el-table-column label="变量值" min-width="120" align="center">
+                  <el-table-column label="变量值" min-width="160">
                     <template #default="{ row }">
-                      <el-input
-                        v-if="row.inputType === 'text'"
-                        v-model="selectedNode.config[row.field]"
-                        placeholder="输入或引用参数值"
-                        size="small"
-                      />
-                      <el-switch
-                        v-else-if="row.inputType === 'boolean'"
-                        v-model="selectedNode.config[row.field]"
-                      />
+                      <!-- Boolean 类型：下拉框 + 关联选择 -->
+                      <div v-if="row.type === 'Boolean'" class="param-value-input">
+                        <el-select
+                          v-model="selectedNode.config[row.field]"
+                          placeholder="选择"
+                          size="small"
+                          class="param-select-with-btn"
+                          clearable
+                        >
+                          <el-option label="true" :value="true" />
+                          <el-option label="false" :value="false" />
+                        </el-select>
+                        <el-icon class="action-icon link-icon" title="关联节点输出" @click="showVariableSelector(row.field)"><Link /></el-icon>
+                      </div>
+                      <!-- File 类型：只显示上传按钮和关联按钮 -->
+                      <div v-else-if="row.type === 'File'" class="param-value-input file-input">
+                        <span v-if="selectedNode.config[row.field]" class="file-value">{{ selectedNode.config[row.field] }}</span>
+                        <span v-else class="file-placeholder">未选择文件</span>
+                        <div class="file-actions">
+                          <el-upload
+                            :show-file-list="false"
+                            accept=".xlsx,.xls"
+                            :before-upload="(file) => handleFileUpload(file, row.field)"
+                          >
+                            <el-icon class="action-icon upload-icon" title="上传文件"><Upload /></el-icon>
+                          </el-upload>
+                          <el-icon class="action-icon link-icon" title="关联节点输出" @click="showVariableSelector(row.field)"><Link /></el-icon>
+                        </div>
+                      </div>
+                      <!-- 其他类型：输入框 + 关联选择 -->
+                      <div v-else class="param-value-input">
+                        <el-input
+                          v-model="selectedNode.config[row.field]"
+                          placeholder="输入或引用参数值"
+                          size="small"
+                          class="param-input-with-btn"
+                        >
+                          <template #suffix>
+                            <el-icon class="action-icon link-icon" title="关联节点输出" @click="showVariableSelector(row.field)"><Link /></el-icon>
+                          </template>
+                        </el-input>
+                      </div>
                     </template>
                   </el-table-column>
                 </el-table>
@@ -2912,6 +3171,36 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- 变量选择器对话框 -->
+    <el-dialog
+      v-model="showVariableSelectorDialog"
+      title="选择变量"
+      width="500px"
+      class="variable-selector-dialog"
+    >
+      <div class="variable-list">
+        <div v-if="getUpstreamNodeOutputs().length === 0" class="no-variables">
+          暂无可关联的前置节点输出变量
+        </div>
+        <div
+          v-for="(item, index) in getUpstreamNodeOutputs()"
+          :key="index"
+          class="variable-item"
+          @click="selectVariable(item.variable)"
+        >
+          <div class="variable-info">
+            <span class="variable-node">{{ item.nodeName }}</span>
+            <span class="variable-arrow">→</span>
+            <span class="variable-param">{{ item.param }}</span>
+          </div>
+          <div class="variable-meta">
+            <span class="variable-type">{{ item.type }}</span>
+            <span class="variable-expr">{{ item.variable }}</span>
+          </div>
+        </div>
+      </div>
+    </el-dialog>
 
     <!-- 重命名对话框 -->
     <el-dialog v-model="renameDialogVisible" title="重命名节点" width="400px">
@@ -3453,6 +3742,12 @@ onUnmounted(() => {
   font-size: 16px;
   font-weight: 600;
   color: #1f2937;
+}
+
+.panel-node-desc {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 2px;
 }
 
 .panel-actions {
@@ -4106,6 +4401,202 @@ onUnmounted(() => {
   background: #585b70;
 }
 
+/* AI助手面板样式 */
+.ai-chat-panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+  z-index: 99;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+}
+
+.ai-chat-panel.expanded {
+  height: 300px;
+}
+
+.ai-chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.ai-chat-header:hover {
+  background: linear-gradient(135deg, #ede9fe 0%, #e0e7ff 100%);
+}
+
+.ai-chat-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #4f46e5;
+}
+
+.ai-chat-header .expand-icon {
+  color: #6366f1;
+  transition: transform 0.3s ease;
+}
+
+.ai-chat-header .expand-icon.expanded {
+  transform: rotate(180deg);
+}
+
+.ai-chat-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ai-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #f9fafb;
+}
+
+.ai-message-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.ai-message-item.user {
+  justify-content: flex-end;
+}
+
+.ai-message-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ai-message-avatar.user {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.ai-message-bubble {
+  max-width: 70%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.ai-message-item.ai .ai-message-bubble {
+  background: #fff;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+  border-top-left-radius: 4px;
+}
+
+.ai-message-item.user .ai-message-bubble {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  border-top-right-radius: 4px;
+}
+
+.ai-message-bubble.typing {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 16px;
+}
+
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #a5b4fc;
+  animation: typing 1.4s infinite ease-in-out;
+}
+
+.typing-dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typing {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.ai-chat-input-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+}
+
+.ai-chat-input-area .el-input {
+  flex: 1;
+}
+
+.ai-chat-input-area .send-icon {
+  cursor: pointer;
+  color: #6366f1;
+  transition: color 0.2s;
+}
+
+.ai-chat-input-area .send-icon:hover {
+  color: #4f46e5;
+}
+
+.ai-chat-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ai-chat-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ai-chat-messages::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.ai-chat-messages::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
 /* 文本清洗节点配置样式 */
 .input-type-radio {
   display: flex;
@@ -4503,5 +4994,155 @@ onUnmounted(() => {
   padding: 2px 10px;
   background: #f3f4f6;
   border-radius: 4px;
+}
+
+/* 参数值输入样式 */
+.param-value-input {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.param-input-with-btn {
+  width: 100%;
+}
+
+.param-select-with-btn {
+  flex: 1;
+  min-width: 0;
+}
+
+.param-value-input .link-icon {
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+/* File 类型输入样式 */
+.param-value-input.file-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.file-value {
+  flex: 1;
+  font-size: 12px;
+  color: #374151;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-placeholder {
+  flex: 1;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.file-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.param-input-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-icon {
+  cursor: pointer;
+  font-size: 14px;
+  color: #9ca3af;
+  transition: color 0.2s;
+}
+
+.action-icon:hover {
+  color: #6366f1;
+}
+
+.upload-icon:hover {
+  color: #10b981;
+}
+
+.link-icon:hover {
+  color: #3b82f6;
+}
+
+/* 变量选择器对话框样式 */
+.variable-selector-dialog .variable-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.variable-selector-dialog .no-variables {
+  text-align: center;
+  color: #9ca3af;
+  padding: 40px 20px;
+  font-size: 14px;
+}
+
+.variable-selector-dialog .variable-item {
+  padding: 12px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.variable-selector-dialog .variable-item:hover {
+  border-color: #6366f1;
+  background: #f5f3ff;
+}
+
+.variable-selector-dialog .variable-item:last-child {
+  margin-bottom: 0;
+}
+
+.variable-selector-dialog .variable-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.variable-selector-dialog .variable-node {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.variable-selector-dialog .variable-arrow {
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.variable-selector-dialog .variable-param {
+  font-size: 13px;
+  color: #6366f1;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.variable-selector-dialog .variable-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.variable-selector-dialog .variable-type {
+  font-size: 11px;
+  color: #6b7280;
+  padding: 2px 6px;
+  background: #f3f4f6;
+  border-radius: 3px;
+}
+
+.variable-selector-dialog .variable-expr {
+  font-size: 11px;
+  color: #9ca3af;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
 </style>
