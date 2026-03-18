@@ -765,6 +765,14 @@ const addNode = (type) => {
     newNode.outputs = []
   }
 
+  // 循环节点特殊处理
+  if (type === 'loop') {
+    newNode.inputParams = []
+    newNode.config = {
+      arrayElementType: 'string',
+    }
+  }
+
   nodes.value.push(newNode)
   selectedNode.value = newNode
 }
@@ -1266,6 +1274,10 @@ const selectNode = (node, event) => {
   if (node.type === 'textClean') {
     initTextCleanConfig()
   }
+  // 初始化循环节点配置
+  if (node.type === 'loop') {
+    initLoopConfig()
+  }
 }
 
 // 选中连线
@@ -1470,6 +1482,39 @@ const getNodeInputParams = (node) => {
     }))
   }
 
+  // 循环节点：从 inputParams 配置读取（支持用户自定义）
+  if (node.type === 'loop') {
+    const params = []
+    // 固定参数
+    params.push({
+      name: 'times',
+      type: 'Number',
+      required: false,
+      description: '循环次数，要求为正整数',
+    })
+    params.push({
+      name: 'cycle_array',
+      type: 'Array',
+      required: false,
+      description: '循环数组',
+      elementType: node.config?.arrayElementType || 'string',
+    })
+    // 用户自定义输入变量
+    if (node.inputParams && node.inputParams.length > 0) {
+      node.inputParams.forEach((param) => {
+        if (param.name) {
+          params.push({
+            name: param.name,
+            type: formatParamType(param),
+            required: param.required || false,
+            description: param.description || '',
+          })
+        }
+      })
+    }
+    return params
+  }
+
   // 其他节点：默认输入参数
   return [{ name: 'input', type: 'Any' }]
 }
@@ -1626,6 +1671,41 @@ const getApiAutoOutputParams = () => {
 const refreshApiAutoOutputs = () => {
   // 这个函数会在response值变化时被调用
   // 输出参数会通过 getApiAutoOutputParams 自动更新
+}
+
+// 初始化循环节点配置
+const initLoopConfig = () => {
+  if (!selectedNode.value) return
+  if (!selectedNode.value.inputParams) {
+    selectedNode.value.inputParams = []
+  }
+  if (!selectedNode.value.config) {
+    selectedNode.value.config = {}
+  }
+  if (!selectedNode.value.config.arrayElementType) {
+    selectedNode.value.config.arrayElementType = 'string'
+  }
+}
+
+// 添加循环节点的自定义输入变量
+const addLoopInputParam = () => {
+  if (!selectedNode.value) return
+  if (!selectedNode.value.inputParams) {
+    selectedNode.value.inputParams = []
+  }
+  selectedNode.value.inputParams.push({
+    name: '',
+    type: 'string',
+    elementType: 'string',
+    required: false,
+    description: '',
+  })
+}
+
+// 删除循环节点的自定义输入变量
+const removeLoopInputParam = (index) => {
+  if (!selectedNode.value || !selectedNode.value.inputParams) return
+  selectedNode.value.inputParams.splice(index, 1)
 }
 
 // 初始化条件判断节点配置
@@ -2060,6 +2140,14 @@ const addConnectedNode = (type) => {
       { id: 'out-branch-0', name: '分支1' },
       { id: 'out-default', name: '默认' },
     ]
+  }
+
+  // 循环节点特殊处理
+  if (type === 'loop') {
+    newNode.inputParams = []
+    newNode.config = {
+      arrayElementType: 'string',
+    }
   }
 
   nodes.value.push(newNode)
@@ -3147,6 +3235,158 @@ onUnmounted(() => {
                     <span class="branch-hint">当以上条件都不满足时执行</span>
                   </div>
                 </div>
+              </div>
+            </div>
+          </template>
+
+          <!-- 循环节点配置 -->
+          <template v-if="selectedNode.type === 'loop'">
+            <!-- 输入参数 -->
+            <div class="io-section">
+              <div class="io-section-header">
+                <el-icon class="expand-icon"><ArrowDown /></el-icon>
+                <span class="io-section-title">输入</span>
+              </div>
+              <div class="io-section-content">
+                <el-table
+                  :data="[
+                    { name: 'times', type: 'Number', required: false, desc: '循环次数，要求为正整数', field: 'timesValue' },
+                    { name: 'cycle_array', type: 'Array', required: false, desc: '循环数组', field: 'cycleArrayValue', isArray: true }
+                  ]"
+                  size="small"
+                  class="io-table"
+                >
+                  <el-table-column label="变量名" min-width="160">
+                    <template #default="{ row }">
+                      <div class="param-name-cell">
+                        <span v-if="row.required" class="required-mark">*</span>
+                        <span class="param-name-text">{{ row.name }}</span>
+                        <el-tooltip :content="row.desc" placement="top" :show-after="300">
+                          <el-icon class="param-desc-icon"><QuestionFilled /></el-icon>
+                        </el-tooltip>
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="类型" width="140" align="center">
+                    <template #default="{ row }">
+                      <!-- Array类型显示级联选择器 -->
+                      <el-cascader
+                        v-if="row.isArray"
+                        v-model="selectedNode.config.arrayElementType"
+                        :options="typeOptions"
+                        :props="{ emitPath: false, checkStrictly: true }"
+                        size="small"
+                        placeholder="选择类型"
+                        style="width: 120px"
+                      />
+                      <span v-else class="param-type-tag">{{ row.type }}</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="变量值" min-width="160">
+                    <template #default="{ row }">
+                      <div class="param-value-input">
+                        <el-input
+                          v-model="selectedNode.config[row.field]"
+                          placeholder="输入或引用参数值"
+                          size="small"
+                          class="param-input-with-btn"
+                        >
+                          <template #suffix>
+                            <el-icon class="action-icon link-icon" title="关联节点输出" @click="showVariableSelector(row.field)"><Link /></el-icon>
+                          </template>
+                        </el-input>
+                      </div>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
+            </div>
+
+            <!-- 自定义输入变量 -->
+            <div class="io-section">
+              <div class="io-section-header">
+                <el-icon class="expand-icon"><ArrowDown /></el-icon>
+                <span class="io-section-title">自定义输入变量</span>
+                <el-button type="primary" text size="small" :icon="Plus" @click="addLoopInputParam" style="margin-left: auto;">
+                  添加变量
+                </el-button>
+              </div>
+              <div class="io-section-content">
+                <el-table
+                  v-if="selectedNode.inputParams && selectedNode.inputParams.length > 0"
+                  :data="selectedNode.inputParams"
+                  size="small"
+                  class="io-table"
+                >
+                  <el-table-column label="变量名" min-width="120">
+                    <template #default="{ row }">
+                      <el-input v-model="row.name" placeholder="变量名" size="small" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="类型" width="140" align="center">
+                    <template #default="{ row }">
+                      <el-cascader
+                        :model-value="getTypeValue(row)"
+                        @update:model-value="(val) => handleTypeChange(val, row)"
+                        :options="typeOptions"
+                        :props="{ checkStrictly: true }"
+                        size="small"
+                        placeholder="选择类型"
+                        style="width: 120px"
+                      />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="必填" width="60" align="center">
+                    <template #default="{ row }">
+                      <el-checkbox v-model="row.required" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="操作" width="60" align="center">
+                    <template #default="{ $index }">
+                      <el-button
+                        type="danger"
+                        text
+                        size="small"
+                        :icon="Delete"
+                        @click="removeLoopInputParam($index)"
+                      />
+                    </template>
+                  </el-table-column>
+                </el-table>
+                <div v-else class="empty-params-hint">
+                  <span>暂无自定义变量，点击"添加变量"按钮添加</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 输出参数 -->
+            <div class="io-section">
+              <div class="io-section-header">
+                <el-icon class="expand-icon"><ArrowDown /></el-icon>
+                <span class="io-section-title">输出</span>
+              </div>
+              <div class="io-section-content">
+                <el-table
+                  :data="[{ name: 'current_item', type: 'Any', desc: '当前循环项' }, { name: 'current_index', type: 'Number', desc: '当前循环索引' }]"
+                  size="small"
+                  class="io-table"
+                >
+                  <el-table-column label="变量名" min-width="160">
+                    <template #default="{ row }">
+                      <div class="param-name-cell">
+                        <span class="param-name-text">{{ row.name }}</span>
+                        <el-tooltip :content="row.desc" placement="top" :show-after="300">
+                          <el-icon class="param-desc-icon"><QuestionFilled /></el-icon>
+                        </el-tooltip>
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="类型" width="100" align="center">
+                    <template #default="{ row }">
+                      <span class="param-type-tag">{{ row.type }}</span>
+                    </template>
+                  </el-table-column>
+                </el-table>
               </div>
             </div>
           </template>
@@ -5133,6 +5373,14 @@ onUnmounted(() => {
 }
 
 /* 输入参数定义样式 */
+/* 空参数提示样式 */
+.empty-params-hint {
+  padding: 16px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
 .input-params-definition {
   padding: 12px 16px;
   background: #faf5ff;
