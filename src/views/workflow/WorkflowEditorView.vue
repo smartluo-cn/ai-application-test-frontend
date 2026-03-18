@@ -102,10 +102,26 @@ const enterLoopBody = (loopBodyNode) => {
 const exitLoopBody = () => {
   if (nestedCanvasState.value) {
     // 保存数据到循环体节点
-    const loopBodyNode = nodes.value.find(n => n.id === nestedCanvasState.value.parentNodeId)
+    const loopBodyNode = nodes.value.find((n) => n.id === nestedCanvasState.value.parentNodeId)
     if (loopBodyNode) {
       loopBodyNode.innerNodes = nestedCanvasState.value.nodes
       loopBodyNode.innerConnections = nestedCanvasState.value.connections
+
+      // 计算内部节点的偏移量（基于最小坐标值）
+      const innerNodes = nestedCanvasState.value.nodes
+      if (innerNodes && innerNodes.length > 0) {
+        let minX = Infinity
+        let minY = Infinity
+        innerNodes.forEach((node) => {
+          if (node.x < minX) minX = node.x
+          if (node.y < minY) minY = node.y
+        })
+        loopBodyNode.innerOffsetX = minX
+        loopBodyNode.innerOffsetY = minY
+      } else {
+        loopBodyNode.innerOffsetX = 0
+        loopBodyNode.innerOffsetY = 0
+      }
     }
     nestedCanvasState.value = null
     ElMessage.success('已退出循环体')
@@ -114,6 +130,65 @@ const exitLoopBody = () => {
 
 // 检查是否在嵌套画布中
 const isInNestedCanvas = computed(() => nestedCanvasState.value !== null)
+
+// 计算循环体节点内部画布的大小
+const getLoopBodyCanvasSize = (loopBodyNode) => {
+  const innerNodes = loopBodyNode.innerNodes || []
+  if (innerNodes.length === 0) {
+    return { width: 280, height: 120 }
+  }
+
+  // 找到最右边和最下边的节点位置
+  let maxX = 0
+  let maxY = 0
+  innerNodes.forEach((node) => {
+    const nodeRight = (node.x - (loopBodyNode.innerOffsetX || 0)) + 80 // 内部节点缩略图宽度
+    const nodeBottom = (node.y - (loopBodyNode.innerOffsetY || 0)) + 40 // 内部节点缩略图高度
+    if (nodeRight > maxX) maxX = nodeRight
+    if (nodeBottom > maxY) maxY = nodeBottom
+  })
+
+  // 添加边距和头部高度
+  return {
+    width: Math.max(280, maxX + 30),
+    height: Math.max(120, maxY + 30 + 28),
+  }
+}
+
+// 计算内部节点在缩略画布中的位置
+const getInnerNodeStyle = (innerNode, loopBodyNode) => {
+  const offsetX = loopBodyNode.innerOffsetX || 0
+  const offsetY = loopBodyNode.innerOffsetY || 0
+  return {
+    left: `${innerNode.x - offsetX + 15}px`,
+    top: `${innerNode.y - offsetY + 28 + 15}px`,
+  }
+}
+
+// 计算内部连线的路径
+const getInnerConnectionPath = (conn, loopBodyNode) => {
+  const innerNodes = loopBodyNode.innerNodes || []
+  const offsetX = loopBodyNode.innerOffsetX || 0
+  const offsetY = loopBodyNode.innerOffsetY || 0
+
+  const sourceNode = innerNodes.find((n) => n.id === conn.sourceId)
+  const targetNode = innerNodes.find((n) => n.id === conn.targetId)
+
+  if (!sourceNode || !targetNode) return ''
+
+  // 内部节点缩略图尺寸: 80x32
+  const nodeWidth = 80
+  const nodeHeight = 32
+
+  const sx = sourceNode.x - offsetX + 15 + nodeWidth
+  const sy = sourceNode.y - offsetY + 28 + 15 + nodeHeight / 2
+  const tx = targetNode.x - offsetX + 15
+  const ty = targetNode.y - offsetY + 28 + 15 + nodeHeight / 2
+
+  const midX = (sx + tx) / 2
+
+  return `M ${sx} ${sy} C ${midX} ${sy}, ${midX} ${ty}, ${tx} ${ty}`
+}
 
 // 节点类型分组配置
 const nodeCategories = [
@@ -2214,6 +2289,8 @@ const addConnectedNode = (type) => {
       parentId: newNode.id, // 关联父循环节点
       innerNodes: [], // 内部嵌套的节点
       innerConnections: [], // 内部嵌套的连线
+      innerOffsetX: 0, // 内部节点的偏移量
+      innerOffsetY: 0,
     }
     nodes.value.push(loopBodyNode)
 
@@ -2760,20 +2837,43 @@ onUnmounted(() => {
                 </div>
               </template>
 
-              <!-- 循环体节点：特殊容器节点 -->
+              <!-- 循环体节点：特殊容器节点，内部直接显示嵌套画布 -->
               <template v-else-if="node.type === 'loopBody'">
-                <!-- 左侧进入按钮 -->
-                <div
-                  class="loop-body-enter-btn"
-                  @click.stop="enterLoopBody(node)"
-                  title="进入循环体"
-                >
-                  <el-icon :size="14"><ArrowRight /></el-icon>
-                </div>
                 <div class="input-port node-edge-port node-center-port" @mouseup.stop="endConnection(node, null, 0, $event)"></div>
-                <div class="loop-body-info">
-                  <span class="loop-body-count">{{ node.innerNodes?.length || 0 }} 个节点</span>
-                  <span class="loop-body-hint">点击左侧按钮进入</span>
+                <!-- 内部嵌套画布 -->
+                <div class="loop-body-canvas">
+                  <div class="loop-body-canvas-header">
+                    <span class="loop-body-title">循环体</span>
+                    <span class="loop-body-count">{{ node.innerNodes?.length || 0 }} 个节点</span>
+                  </div>
+                  <div class="loop-body-canvas-content" v-if="node.innerNodes && node.innerNodes.length > 0">
+                    <!-- 内部节点缩略图 -->
+                    <div
+                      v-for="innerNode in node.innerNodes"
+                      :key="innerNode.id"
+                      class="loop-body-inner-node"
+                      :style="getInnerNodeStyle(innerNode, node)"
+                    >
+                      <div class="inner-node-icon" :style="{ background: `${getNodeTypeConfig(innerNode.type).color}15`, color: getNodeTypeConfig(innerNode.type).color }">
+                        <el-icon :size="10">
+                          <component :is="getIconComponent(getNodeTypeConfig(innerNode.type).icon)" />
+                        </el-icon>
+                      </div>
+                      <span class="inner-node-name">{{ innerNode.name }}</span>
+                    </div>
+                    <!-- 内部连线 -->
+                    <svg class="loop-body-connections" :width="getLoopBodyCanvasSize(node).width" :height="getLoopBodyCanvasSize(node).height">
+                      <path
+                        v-for="conn in node.innerConnections"
+                        :key="conn.id"
+                        :d="getInnerConnectionPath(conn, node)"
+                        class="inner-connection-path"
+                      />
+                    </svg>
+                  </div>
+                  <div class="loop-body-empty" v-else>
+                    <span class="empty-hint">拖拽节点到此处</span>
+                  </div>
                 </div>
                 <div class="output-port node-edge-port node-center-port" @mousedown.stop="startConnectionFromOutput(node, null, 0, $event)"></div>
               </template>
@@ -4293,60 +4393,113 @@ onUnmounted(() => {
 }
 
 /* 循环体节点样式 */
-.loop-body-enter-btn {
-  position: absolute;
-  left: -24px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 20px;
-  height: 40px;
-  background: linear-gradient(135deg, #06b6d4, #0891b2);
-  border-radius: 4px 0 0 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: #fff;
-  box-shadow: -2px 2px 6px rgba(6, 182, 212, 0.3);
-  transition: all 0.2s;
-  z-index: 10;
-}
-
-.loop-body-enter-btn:hover {
-  background: linear-gradient(135deg, #22d3ee, #06b6d4);
-  transform: translateY(-50%) scale(1.1);
-  box-shadow: -3px 3px 10px rgba(6, 182, 212, 0.5);
-}
-
-.loop-body-info {
+.loop-body-canvas {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 8px 12px;
-  flex: 1;
-}
-
-.loop-body-count {
-  font-size: 14px;
-  font-weight: 500;
-  color: #0891b2;
-}
-
-.loop-body-hint {
-  font-size: 11px;
-  color: #9ca3af;
-}
-
-/* 循环体节点特殊样式 */
-.flow-node:has(.loop-body-enter-btn) {
-  background: linear-gradient(135deg, #ecfeff, #f0fdfa);
-  border: 2px dashed #06b6d4;
+  background: #f8fafc;
+  border-radius: 6px;
+  overflow: hidden;
   min-height: 80px;
 }
 
-.flow-node:has(.loop-body-enter-btn):hover {
+.loop-body-canvas-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: linear-gradient(135deg, #e0f2fe, #f0fdfa);
+  border-bottom: 1px solid #bae6fd;
+}
+
+.loop-body-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #0369a1;
+}
+
+.loop-body-count {
+  font-size: 10px;
+  color: #0ea5e9;
+}
+
+.loop-body-canvas-content {
+  position: relative;
+  flex: 1;
+  min-height: 60px;
+  overflow: hidden;
+}
+
+.loop-body-inner-node {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  width: 80px;
+}
+
+.inner-node-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inner-node-name {
+  font-size: 9px;
+  color: #475569;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 68px;
+}
+
+.loop-body-connections {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.inner-connection-path {
+  fill: none;
+  stroke: #94a3b8;
+  stroke-width: 1;
+  opacity: 0.6;
+}
+
+.loop-body-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 60px;
+}
+
+.loop-body-empty .empty-hint {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+/* 循环体节点特殊样式 */
+.flow-node:has(.loop-body-canvas) {
+  background: linear-gradient(135deg, #ecfeff, #f0fdfa);
+  border: 2px dashed #06b6d4;
+  min-height: 120px;
+  width: auto;
+  min-width: 300px;
+}
+
+.flow-node:has(.loop-body-canvas):hover {
   border-color: #0891b2;
   box-shadow: 0 4px 12px rgba(6, 182, 212, 0.2);
 }
