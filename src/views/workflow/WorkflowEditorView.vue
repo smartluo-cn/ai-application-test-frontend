@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowLeft,
+  ArrowRight,
   DocumentChecked,
   VideoPlay,
   Setting,
@@ -68,6 +69,52 @@ const canvas = reactive({
   height: 2000,
 })
 
+// 嵌套画布状态（用于循环体等容器节点）
+const nestedCanvasState = ref(null) // 当前进入的嵌套画布信息
+const nestedCanvasData = ref({}) // 存储每个循环体节点的内部数据
+
+// 进入循环体
+const enterLoopBody = (loopBodyNode) => {
+  // 保存当前画布状态
+  nestedCanvasState.value = {
+    parentNodeId: loopBodyNode.id,
+    parentNodeName: loopBodyNode.name,
+    nodes: loopBodyNode.innerNodes || [],
+    connections: loopBodyNode.innerConnections || [],
+  }
+
+  // 初始化嵌套画布数据（如果不存在）
+  if (!nestedCanvasData.value[loopBodyNode.id]) {
+    nestedCanvasData.value[loopBodyNode.id] = {
+      nodes: [],
+      connections: [],
+    }
+  }
+
+  // 同步到嵌套画布数据
+  nestedCanvasData.value[loopBodyNode.id].nodes = nestedCanvasState.value.nodes
+  nestedCanvasData.value[loopBodyNode.id].connections = nestedCanvasState.value.connections
+
+  ElMessage.success(`已进入${loopBodyNode.name}`)
+}
+
+// 退出循环体
+const exitLoopBody = () => {
+  if (nestedCanvasState.value) {
+    // 保存数据到循环体节点
+    const loopBodyNode = nodes.value.find(n => n.id === nestedCanvasState.value.parentNodeId)
+    if (loopBodyNode) {
+      loopBodyNode.innerNodes = nestedCanvasState.value.nodes
+      loopBodyNode.innerConnections = nestedCanvasState.value.connections
+    }
+    nestedCanvasState.value = null
+    ElMessage.success('已退出循环体')
+  }
+}
+
+// 检查是否在嵌套画布中
+const isInNestedCanvas = computed(() => nestedCanvasState.value !== null)
+
 // 节点类型分组配置
 const nodeCategories = [
   { key: 'logic', name: '逻辑处理' },
@@ -86,6 +133,7 @@ const nodeTypes = [
   // 逻辑处理
   { type: 'condition', name: '条件判断', icon: 'Brush', color: '#ec4899', category: 'logic' },
   { type: 'loop', name: '循环', icon: 'Timer', color: '#3b82f6', category: 'logic' },
+  { type: 'loopBody', name: '循环体', icon: 'Grid', color: '#06b6d4', category: 'basic' }, // 循环体节点，不在弹窗中显示
   // 测试准备
   { type: 'envConnect', name: '环境对接', icon: 'Monitor', color: '#64748b', category: 'testPrep' },
   { type: 'tableExtract', name: '表格提取', icon: 'Grid', color: '#10b981', category: 'testPrep' },
@@ -185,6 +233,7 @@ const iconComponents = {
   DataAnalysis,
   Stopwatch,
   TrendCharts,
+  Grid,
 }
 
 // 节点列表
@@ -2142,12 +2191,51 @@ const addConnectedNode = (type) => {
     ]
   }
 
-  // 循环节点特殊处理
+  // 循环节点特殊处理：自动创建循环体节点
   if (type === 'loop') {
     newNode.inputParams = []
     newNode.config = {
       arrayElementType: 'string',
     }
+
+    // 添加循环节点
+    nodes.value.push(newNode)
+
+    // 自动创建循环体节点
+    const loopBodyNode = {
+      id: `loopBody-${Date.now() + 1}`,
+      type: 'loopBody',
+      name: '循环体',
+      x: newNode.x + 280, // 放在循环节点右侧
+      y: newNode.y,
+      inputs: [{ id: `in-lb-${Date.now() + 1}`, name: '输入' }],
+      outputs: [{ id: `out-lb-${Date.now() + 1}`, name: '输出' }],
+      config: {},
+      parentId: newNode.id, // 关联父循环节点
+      innerNodes: [], // 内部嵌套的节点
+      innerConnections: [], // 内部嵌套的连线
+    }
+    nodes.value.push(loopBodyNode)
+
+    // 自动创建从循环节点到循环体节点的连线
+    const loopOutputPort = newNode.outputs[0]
+    const loopBodyInputPort = loopBodyNode.inputs[0]
+    if (loopOutputPort && loopBodyInputPort) {
+      connections.value.push({
+        id: `conn-${Date.now() + 2}`,
+        sourceId: newNode.id,
+        sourcePort: loopOutputPort.id,
+        targetId: loopBodyNode.id,
+        targetPort: loopBodyInputPort.id,
+        sourceParamIndex: 0,
+        targetParamIndex: 0,
+      })
+    }
+
+    showAddNodePopover.value = null
+    insertConnection.value = null
+    selectedNode.value = newNode
+    return // 提前返回，因为节点已经添加过了
   }
 
   nodes.value.push(newNode)
@@ -2465,10 +2553,20 @@ onUnmounted(() => {
   <div class="workflow-editor">
     <!-- 悬浮工具栏 -->
     <div class="floating-toolbar">
-      <el-button text :icon="ArrowLeft" @click="goBack" title="返回">返回</el-button>
+      <el-button text :icon="ArrowLeft" @click="isInNestedCanvas ? exitLoopBody() : goBack()" :title="isInNestedCanvas ? '退出循环体' : '返回'">
+        {{ isInNestedCanvas ? '退出循环体' : '返回' }}
+      </el-button>
       <div class="toolbar-divider"></div>
       <div class="workflow-name-display">
-        <span class="workflow-name-text">{{ workflow.name }}</span>
+        <!-- 面包屑导航 -->
+        <template v-if="isInNestedCanvas">
+          <span class="breadcrumb-item" @click="exitLoopBody">{{ workflow.name }}</span>
+          <el-icon class="breadcrumb-separator"><ArrowRight /></el-icon>
+          <span class="breadcrumb-item active">{{ nestedCanvasState?.parentNodeName || '循环体' }}</span>
+        </template>
+        <template v-else>
+          <span class="workflow-name-text">{{ workflow.name }}</span>
+        </template>
       </div>
       <div class="toolbar-divider"></div>
       <div class="zoom-controls">
@@ -2660,6 +2758,24 @@ onUnmounted(() => {
                     </span>
                   </span>
                 </div>
+              </template>
+
+              <!-- 循环体节点：特殊容器节点 -->
+              <template v-else-if="node.type === 'loopBody'">
+                <!-- 左侧进入按钮 -->
+                <div
+                  class="loop-body-enter-btn"
+                  @click.stop="enterLoopBody(node)"
+                  title="进入循环体"
+                >
+                  <el-icon :size="14"><ArrowRight /></el-icon>
+                </div>
+                <div class="input-port node-edge-port node-center-port" @mouseup.stop="endConnection(node, null, 0, $event)"></div>
+                <div class="loop-body-info">
+                  <span class="loop-body-count">{{ node.innerNodes?.length || 0 }} 个节点</span>
+                  <span class="loop-body-hint">点击左侧按钮进入</span>
+                </div>
+                <div class="output-port node-edge-port node-center-port" @mousedown.stop="startConnectionFromOutput(node, null, 0, $event)"></div>
               </template>
 
               <!-- 其他节点：分别显示输入和输出参数 -->
@@ -3814,6 +3930,30 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
+/* 面包屑导航样式 */
+.breadcrumb-item {
+  font-size: 14px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.breadcrumb-item:hover {
+  color: #6366f1;
+}
+
+.breadcrumb-item.active {
+  color: #1f2937;
+  font-weight: 600;
+  cursor: default;
+}
+
+.breadcrumb-separator {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: 0 8px;
+}
+
 .zoom-controls {
   display: flex;
   align-items: center;
@@ -4150,6 +4290,65 @@ onUnmounted(() => {
 
 .param-inline-item .inline-port:hover {
   transform: scale(1.2) !important;
+}
+
+/* 循环体节点样式 */
+.loop-body-enter-btn {
+  position: absolute;
+  left: -24px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 40px;
+  background: linear-gradient(135deg, #06b6d4, #0891b2);
+  border-radius: 4px 0 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #fff;
+  box-shadow: -2px 2px 6px rgba(6, 182, 212, 0.3);
+  transition: all 0.2s;
+  z-index: 10;
+}
+
+.loop-body-enter-btn:hover {
+  background: linear-gradient(135deg, #22d3ee, #06b6d4);
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: -3px 3px 10px rgba(6, 182, 212, 0.5);
+}
+
+.loop-body-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 12px;
+  flex: 1;
+}
+
+.loop-body-count {
+  font-size: 14px;
+  font-weight: 500;
+  color: #0891b2;
+}
+
+.loop-body-hint {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+/* 循环体节点特殊样式 */
+.flow-node:has(.loop-body-enter-btn) {
+  background: linear-gradient(135deg, #ecfeff, #f0fdfa);
+  border: 2px dashed #06b6d4;
+  min-height: 80px;
+}
+
+.flow-node:has(.loop-body-enter-btn):hover {
+  border-color: #0891b2;
+  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.2);
 }
 
 /* 输入端口样式 */
