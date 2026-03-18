@@ -133,20 +133,15 @@ const handleSubmit = async () => {
     console.log('提交项目数据:', formData.value)
     ElMessage.success('项目创建成功')
 
-    // 根据方案类型跳转到不同页面
-    if (formData.value.solutionType === 'ai_test') {
-      // AI应用测试 - 跳转到新建工作流的编排页面
-      // TODO: 后端返回新创建的工作流 ID，这里暂时使用时间戳模拟
-      const newWorkflowId = `workflow_${Date.now()}`
-      // 通过 query 参数传递项目名称
-      router.push({
-        path: `/workflow/${newWorkflowId}`,
-        query: { projectName: formData.value.projectName },
-      })
-    } else {
-      // 其他方案 - 跳转回集成验证页面
-      router.push('/integration')
-    }
+    // 项目创建成功后，跳转到项目空间页面
+    router.push({
+      path: '/project-space',
+      query: {
+        projectName: formData.value.projectName,
+        projectType: formData.value.projectType,
+        solutionType: formData.value.solutionType,
+      },
+    })
   } catch {
     ElMessage.warning('请完善必填信息')
   }

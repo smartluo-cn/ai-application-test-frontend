@@ -29,6 +29,13 @@ const router = createRouter({
       component: () => import('@/views/integration/CreateProjectView.vue'),
       meta: { title: '创建项目' },
     },
+    // 项目空间 - 独立页面
+    {
+      path: '/project-space',
+      name: 'project-space',
+      component: () => import('@/views/project/ProjectSpaceView.vue'),
+      meta: { title: '项目空间' },
+    },
     {
       path: '/app',
       component: MainLayout,
