@@ -508,6 +508,38 @@ const getPortDomPosition = (nodeId, paramIndex, type, nodeType = null) => {
   }
 }
 
+// 获取特殊节点端口的计算位置（用于 loop 和 loopBody 节点）
+const getSpecialPortPosition = (node, type) => {
+  const nodeWidth = 220
+  const nodeElement = document.querySelector(`[data-node-id="${node.id}"]`)
+  if (!nodeElement) return null
+
+  const nodeRect = nodeElement.getBoundingClientRect()
+  const canvasRect = document.querySelector('.canvas')?.getBoundingClientRect()
+  if (!canvasRect) return null
+
+  // 获取节点的实际高度
+  const nodeHeight = nodeRect.height
+
+  if (node.type === 'loop' && type === 'output') {
+    // 循环节点的输出端口在底部水平居中
+    return {
+      x: node.x + nodeWidth / 2,
+      y: node.y + nodeHeight,
+    }
+  }
+
+  if (node.type === 'loopBody' && type === 'input') {
+    // 循环体节点的输入端口在顶部居中
+    return {
+      x: node.x + nodeWidth / 2,
+      y: node.y,
+    }
+  }
+
+  return null
+}
+
 // 计算连线路径
 const getConnectionPath = (connection) => {
   const sourceNode = nodes.value.find((n) => n.id === connection.sourceId)
@@ -519,11 +551,35 @@ const getConnectionPath = (connection) => {
   const sourceParamIndex = connection.sourceParamIndex ?? 0
   const targetParamIndex = connection.targetParamIndex ?? 0
 
+  let x1, y1, x2, y2
+
+  // 检查是否是特殊节点（loop 或 loopBody）
+  const isLoopToLoopBody = sourceNode.type === 'loop' && targetNode.type === 'loopBody'
+
+  if (isLoopToLoopBody) {
+    // 特殊处理：loop 到 loopBody 的连线
+    // 获取循环节点的输出端口位置（底部居中）
+    const loopOutputPos = getSpecialPortPosition(sourceNode, 'output')
+    // 获取循环体节点的输入端口位置（顶部居中）
+    const loopBodyInputPos = getSpecialPortPosition(targetNode, 'input')
+
+    if (loopOutputPos && loopBodyInputPos) {
+      x1 = loopOutputPos.x
+      y1 = loopOutputPos.y
+      x2 = loopBodyInputPos.x
+      y2 = loopBodyInputPos.y
+
+      // 垂直方向的贝塞尔曲线（从底部向下，然后向上到顶部）
+      const verticalDistance = Math.abs(y2 - y1)
+      const controlOffset = Math.max(30, Math.min(verticalDistance * 0.5, 80))
+
+      return `M ${x1} ${y1} C ${x1} ${y1 + controlOffset}, ${x2} ${y2 - controlOffset}, ${x2} ${y2}`
+    }
+  }
+
   // 尝试使用 DOM 获取端口实际位置
   const sourcePortPos = getPortDomPosition(sourceNode.id, sourceParamIndex, 'output', sourceNode.type)
   const targetPortPos = getPortDomPosition(targetNode.id, targetParamIndex, 'input', targetNode.type)
-
-  let x1, y1, x2, y2
 
   if (sourcePortPos && targetPortPos) {
     x1 = sourcePortPos.x
@@ -542,12 +598,35 @@ const getConnectionPath = (connection) => {
       const paramsHeight = params.length > 0 ? 32 : 0
       const nodeHeight = 40 + paramsHeight
       y1 = sourceNode.y + nodeHeight / 2
+    } else if (sourceNode.type === 'loop') {
+      // 循环节点：输出端口在底部居中
+      const loopOutputPos = getSpecialPortPosition(sourceNode, 'output')
+      if (loopOutputPos) {
+        x1 = loopOutputPos.x
+        y1 = loopOutputPos.y
+      } else {
+        y1 = getNodeParamPortPosition(sourceNode, sourceParamIndex, 'output')
+        x1 = sourceNode.x + nodeWidth
+      }
     } else {
       y1 = getNodeParamPortPosition(sourceNode, sourceParamIndex, 'output')
       x1 = sourceNode.x + nodeWidth
     }
-    y2 = getNodeParamPortPosition(targetNode, targetParamIndex, 'input')
-    x2 = targetNode.x
+
+    if (targetNode.type === 'loopBody') {
+      // 循环体节点：输入端口在顶部居中
+      const loopBodyInputPos = getSpecialPortPosition(targetNode, 'input')
+      if (loopBodyInputPos) {
+        x2 = loopBodyInputPos.x
+        y2 = loopBodyInputPos.y
+      } else {
+        y2 = getNodeParamPortPosition(targetNode, targetParamIndex, 'input')
+        x2 = targetNode.x
+      }
+    } else {
+      y2 = getNodeParamPortPosition(targetNode, targetParamIndex, 'input')
+      x2 = targetNode.x
+    }
   }
 
   // 贝塞尔曲线控制点
@@ -568,43 +647,74 @@ const getConnectionMidpoint = (connection) => {
   const sourceParamIndex = connection.sourceParamIndex ?? 0
   const targetParamIndex = connection.targetParamIndex ?? 0
 
-  // 尝试使用 DOM 获取端口实际位置
-  const sourcePortPos = getPortDomPosition(sourceNode.id, sourceParamIndex, 'output', sourceNode.type)
-  const targetPortPos = getPortDomPosition(targetNode.id, targetParamIndex, 'input', targetNode.type)
-
   let x1, y1, x2, y2
+  let isVerticalConnection = false
 
-  if (sourcePortPos && targetPortPos) {
-    x1 = sourcePortPos.x
-    y1 = sourcePortPos.y
-    x2 = targetPortPos.x
-    y2 = targetPortPos.y
-  } else {
-    // 回退到计算位置
-    const nodeWidth = 220
-    // 计算起点：开始节点使用添加按钮位置
-    if (sourceNode.type === 'start') {
-      x1 = sourceNode.x + nodeWidth - 5
-      const params = getNodeOutputParams(sourceNode)
-      const paramsHeight = params.length > 0 ? 32 : 0
-      const nodeHeight = 40 + paramsHeight
-      y1 = sourceNode.y + nodeHeight / 2
-    } else {
-      y1 = getNodeParamPortPosition(sourceNode, sourceParamIndex, 'output')
-      x1 = sourceNode.x + nodeWidth
+  // 检查是否是特殊节点（loop 或 loopBody）
+  const isLoopToLoopBody = sourceNode.type === 'loop' && targetNode.type === 'loopBody'
+
+  if (isLoopToLoopBody) {
+    // 特殊处理：loop 到 loopBody 的连线
+    const loopOutputPos = getSpecialPortPosition(sourceNode, 'output')
+    const loopBodyInputPos = getSpecialPortPosition(targetNode, 'input')
+
+    if (loopOutputPos && loopBodyInputPos) {
+      x1 = loopOutputPos.x
+      y1 = loopOutputPos.y
+      x2 = loopBodyInputPos.x
+      y2 = loopBodyInputPos.y
+      isVerticalConnection = true
     }
-    y2 = getNodeParamPortPosition(targetNode, targetParamIndex, 'input')
-    x2 = targetNode.x
+  }
+
+  if (!isVerticalConnection) {
+    // 尝试使用 DOM 获取端口实际位置
+    const sourcePortPos = getPortDomPosition(sourceNode.id, sourceParamIndex, 'output', sourceNode.type)
+    const targetPortPos = getPortDomPosition(targetNode.id, targetParamIndex, 'input', targetNode.type)
+
+    if (sourcePortPos && targetPortPos) {
+      x1 = sourcePortPos.x
+      y1 = sourcePortPos.y
+      x2 = targetPortPos.x
+      y2 = targetPortPos.y
+    } else {
+      // 回退到计算位置
+      const nodeWidth = 220
+      // 计算起点：开始节点使用添加按钮位置
+      if (sourceNode.type === 'start') {
+        x1 = sourceNode.x + nodeWidth - 5
+        const params = getNodeOutputParams(sourceNode)
+        const paramsHeight = params.length > 0 ? 32 : 0
+        const nodeHeight = 40 + paramsHeight
+        y1 = sourceNode.y + nodeHeight / 2
+      } else {
+        y1 = getNodeParamPortPosition(sourceNode, sourceParamIndex, 'output')
+        x1 = sourceNode.x + nodeWidth
+      }
+      y2 = getNodeParamPortPosition(targetNode, targetParamIndex, 'input')
+      x2 = targetNode.x
+    }
   }
 
   // 贝塞尔曲线在 t=0.5 时的点
-  const distance = Math.abs(x2 - x1)
+  const distance = isVerticalConnection ? Math.abs(y2 - y1) : Math.abs(x2 - x1)
   const controlOffset = Math.max(40, Math.min(distance * 0.4, 120))
 
-  const cx1 = x1 + controlOffset
-  const cy1 = y1
-  const cx2 = x2 - controlOffset
-  const cy2 = y2
+  let cx1, cy1, cx2, cy2
+
+  if (isVerticalConnection) {
+    // 垂直方向的贝塞尔曲线
+    cx1 = x1
+    cy1 = y1 + controlOffset
+    cx2 = x2
+    cy2 = y2 - controlOffset
+  } else {
+    // 水平方向的贝塞尔曲线
+    cx1 = x1 + controlOffset
+    cy1 = y1
+    cx2 = x2 - controlOffset
+    cy2 = y2
+  }
 
   // 三次贝塞尔曲线 t=0.5 时的公式
   const t = 0.5
@@ -638,11 +748,64 @@ const getConnectionPathPart = (connection, part) => {
   const sourceParamIndex = connection.sourceParamIndex ?? 0
   const targetParamIndex = connection.targetParamIndex ?? 0
 
+  let x1, y1, x2, y2
+
+  // 检查是否是特殊节点（loop 或 loopBody）
+  const isLoopToLoopBody = sourceNode.type === 'loop' && targetNode.type === 'loopBody'
+
+  if (isLoopToLoopBody) {
+    // 特殊处理：loop 到 loopBody 的连线
+    const loopOutputPos = getSpecialPortPosition(sourceNode, 'output')
+    const loopBodyInputPos = getSpecialPortPosition(targetNode, 'input')
+
+    if (loopOutputPos && loopBodyInputPos) {
+      x1 = loopOutputPos.x
+      y1 = loopOutputPos.y
+      x2 = loopBodyInputPos.x
+      y2 = loopBodyInputPos.y
+
+      // 垂直方向的贝塞尔曲线
+      const verticalDistance = Math.abs(y2 - y1)
+      const controlOffset = Math.max(30, Math.min(verticalDistance * 0.5, 80))
+
+      // 垂直方向的贝塞尔曲线控制点
+      const cx1 = x1
+      const cy1 = y1 + controlOffset
+      const cx2 = x2
+      const cy2 = y2 - controlOffset
+
+      // 使用 de Casteljau 算法在 t=0.5 处分割贝塞尔曲线
+      const t = 0.5
+
+      // 第一层插值
+      const q0x = (1 - t) * x1 + t * cx1
+      const q0y = (1 - t) * y1 + t * cy1
+      const q1x = (1 - t) * cx1 + t * cx2
+      const q1y = (1 - t) * cy1 + t * cy2
+      const q2x = (1 - t) * cx2 + t * x2
+      const q2y = (1 - t) * cy2 + t * y2
+
+      // 第二层插值
+      const r0x = (1 - t) * q0x + t * q1x
+      const r0y = (1 - t) * q0y + t * q1y
+      const r1x = (1 - t) * q1x + t * q2x
+      const r1y = (1 - t) * q1y + t * q2y
+
+      // 中点（第三层插值）
+      const midX = (1 - t) * r0x + t * r1x
+      const midY = (1 - t) * r0y + t * r1y
+
+      if (part === 'start') {
+        return `M ${x1} ${y1} C ${q0x} ${q0y}, ${r0x} ${r0y}, ${midX} ${midY}`
+      } else {
+        return `M ${midX} ${midY} C ${r1x} ${r1y}, ${q2x} ${q2y}, ${x2} ${y2}`
+      }
+    }
+  }
+
   // 尝试使用 DOM 获取端口实际位置
   const sourcePortPos = getPortDomPosition(sourceNode.id, sourceParamIndex, 'output', sourceNode.type)
   const targetPortPos = getPortDomPosition(targetNode.id, targetParamIndex, 'input', targetNode.type)
-
-  let x1, y1, x2, y2
 
   if (sourcePortPos && targetPortPos) {
     x1 = sourcePortPos.x
@@ -2837,9 +3000,63 @@ onUnmounted(() => {
                 </div>
               </template>
 
+              <!-- 循环节点：输出端口在底部水平居中 -->
+              <template v-else-if="node.type === 'loop'">
+                <!-- 输入端口在节点左侧边缘垂直居中 -->
+                <div
+                  class="input-port node-edge-port node-center-port"
+                  title="input"
+                  @mouseup.stop="endConnection(node, null, 0, $event)"
+                ></div>
+
+                <!-- 输入参数：单行显示 -->
+                <div
+                  v-if="getNodeInputParams(node).length > 0"
+                  class="node-params inline-params input-inline-params"
+                >
+                  <span class="params-label">输入</span>
+                  <span class="params-inline-list">
+                    <span
+                      v-for="(param, idx) in getNodeInputParams(node)"
+                      :key="'in-' + idx"
+                      class="param-inline-item"
+                      :title="param.name + ': ' + param.type"
+                    >
+                      {{ param.name || '新建参数' }}
+                    </span>
+                  </span>
+                </div>
+
+                <!-- 输出参数：单行显示 -->
+                <div
+                  v-if="getNodeOutputParams(node).length > 0"
+                  class="node-params inline-params output-inline-params"
+                >
+                  <span class="params-label">输出</span>
+                  <span class="params-inline-list">
+                    <span
+                      v-for="(param, idx) in getNodeOutputParams(node)"
+                      :key="'out-' + idx"
+                      class="param-inline-item"
+                      :title="param.name + ': ' + param.type"
+                    >
+                      {{ param.name || '新建参数' }}
+                    </span>
+                  </span>
+                </div>
+
+                <!-- 输出端口在节点底部水平居中 -->
+                <div
+                  class="output-port node-edge-port node-bottom-port"
+                  title="output"
+                  @mousedown.stop="startConnectionFromOutput(node, null, 0, $event)"
+                ></div>
+              </template>
+
               <!-- 循环体节点：特殊容器节点，内部直接显示嵌套画布 -->
               <template v-else-if="node.type === 'loopBody'">
-                <div class="input-port node-edge-port node-center-port" @mouseup.stop="endConnection(node, null, 0, $event)"></div>
+                <!-- 输入端口在节点顶部居中 -->
+                <div class="input-port node-edge-port node-top-port" @mouseup.stop="endConnection(node, null, 0, $event)"></div>
                 <!-- 内部嵌套画布 -->
                 <div class="loop-body-canvas">
                   <div class="loop-body-canvas-header">
@@ -4596,6 +4813,31 @@ onUnmounted(() => {
 /* 节点垂直居中端口样式 */
 .node-center-port {
   top: 50% !important;
+}
+
+/* 节点底部端口样式（用于循环节点的输出端口） */
+.node-bottom-port {
+  bottom: -6px !important;
+  top: auto !important;
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%) !important;
+}
+
+.node-bottom-port:hover {
+  transform: translateX(-50%) scale(1.2) !important;
+}
+
+/* 节点顶部端口样式（用于循环体节点的输入端口） */
+.node-top-port {
+  top: -6px !important;
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%) !important;
+}
+
+.node-top-port:hover {
+  transform: translateX(-50%) scale(1.2) !important;
 }
 
 /* 结束节点单行参数样式 - 标签使用红色 */
