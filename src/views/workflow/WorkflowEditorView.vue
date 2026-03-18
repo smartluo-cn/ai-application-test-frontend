@@ -2351,13 +2351,7 @@ const getNodeParamPortPosition = (node, paramIndex, type) => {
 
 // 键盘事件处理
 const handleKeydown = (event) => {
-  if (event.key === 'Delete' || event.key === 'Backspace') {
-    if (selectedNode.value) {
-      deleteSelectedNode()
-    } else if (selectedConnection.value) {
-      deleteSelectedConnection()
-    }
-  } else if (event.key === 'Escape') {
+  if (event.key === 'Escape') {
     deselectAll()
     drawingConnection.value = null
   }
@@ -3412,26 +3406,35 @@ onUnmounted(() => {
                   </el-table-column>
                   <el-table-column label="变量值" min-width="200">
                     <template #default="{ row }">
-                      <div class="param-value-input">
+                      <!-- Textarea 类型（response、body、headers）：文本域 + 关联按钮 -->
+                      <div v-if="row.name === 'response' || row.name === 'body' || row.name === 'headers'" class="param-value-input textarea-input">
                         <el-input
                           v-model="selectedNode.config[row.field]"
                           :placeholder="row.name === 'response' ? '输入JSON示例以推断输出变量' : '输入或引用参数值'"
                           size="small"
-                          :type="row.name === 'response' || row.name === 'body' || row.name === 'headers' ? 'textarea' : 'text'"
-                          :rows="row.name === 'response' || row.name === 'body' || row.name === 'headers' ? 3 : 1"
-                          class="param-input-with-btn"
+                          type="textarea"
+                          :rows="3"
+                          class="param-textarea-with-btn"
                           @input="row.name === 'response' && refreshApiAutoOutputs()"
-                        >
-                          <template v-if="row.name !== 'response' && row.name !== 'body' && row.name !== 'headers'" #suffix>
-                            <el-icon class="action-icon link-icon" title="关联节点输出" @click="showVariableSelector(row.field)"><Link /></el-icon>
-                          </template>
-                        </el-input>
+                        />
                         <el-icon
-                          v-if="row.name === 'response' || row.name === 'body' || row.name === 'headers'"
-                          class="action-icon link-icon textarea-link-icon"
+                          class="action-icon link-icon"
                           title="关联节点输出"
                           @click="showVariableSelector(row.field)"
                         ><Link /></el-icon>
+                      </div>
+                      <!-- 其他类型：输入框 + 关联选择 -->
+                      <div v-else class="param-value-input">
+                        <el-input
+                          v-model="selectedNode.config[row.field]"
+                          placeholder="输入或引用参数值"
+                          size="small"
+                          class="param-input-with-btn"
+                        >
+                          <template #suffix>
+                            <el-icon class="action-icon link-icon" title="关联节点输出" @click="showVariableSelector(row.field)"><Link /></el-icon>
+                          </template>
+                        </el-input>
                       </div>
                     </template>
                   </el-table-column>
@@ -5417,6 +5420,22 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* Textarea 类型输入样式 */
+.param-value-input.textarea-input {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.param-textarea-with-btn {
+  flex: 1;
+}
+
+.param-value-input.textarea-input .link-icon {
+  margin-left: 0;
+  margin-top: 6px;
 }
 
 .file-value {
