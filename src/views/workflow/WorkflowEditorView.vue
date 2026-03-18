@@ -102,7 +102,7 @@ const nodeTypes = [
   // 测试设计
   { type: 'testPlan', name: '测试方案生成', icon: 'DocumentAdd', color: '#f97316', category: 'testDesign' },
   // 测试执行
-  { type: 'apiAuto', name: '接口自动化', icon: 'Connection', color: '#3b82f6', category: 'testExec' },
+  { type: 'apiAuto', name: 'HTTPS/HTTP接口调用', icon: 'Connection', color: '#3b82f6', category: 'testExec' },
   { type: 'aiAuto', name: 'AI自动化', icon: 'Cpu', color: '#8b5cf6', category: 'testExec' },
   // 结果评估
   { type: 'judgeModel', name: '裁判模型', icon: 'DataAnalysis', color: '#ec4899', category: 'eval' },
@@ -235,7 +235,7 @@ const nodes = ref([
   {
     id: 'apiAuto-1',
     type: 'apiAuto',
-    name: '接口自动化',
+    name: 'HTTPS/HTTP接口调用',
     x: 1220,
     y: 300,
     inputs: [{ id: 'in-api-1', name: '输入' }],
@@ -1536,10 +1536,43 @@ const getNodeOutputParams = (node) => {
     ]
   }
 
-  // 接口自动化节点
+  // HTTPS/HTTP接口调用节点
   if (node.type === 'apiAuto') {
+    const responseValue = node.config?.responseValue
+    // 尝试解析response是否为JSON结构
+    if (responseValue && typeof responseValue === 'string' && responseValue.trim()) {
+      try {
+        const parsed = JSON.parse(responseValue.trim())
+        if (typeof parsed === 'object' && parsed !== null) {
+          // 根据JSON结构生成输出变量
+          const outputs = []
+          const flattenObject = (obj, prefix = '') => {
+            for (const key in obj) {
+              const varName = prefix ? `${prefix}.${key}` : key
+              const value = obj[key]
+              if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+                flattenObject(value, varName)
+              } else {
+                let varType = 'String'
+                if (typeof value === 'number') varType = 'Number'
+                else if (typeof value === 'boolean') varType = 'Boolean'
+                else if (Array.isArray(value)) varType = 'Array'
+                outputs.push({ name: varName, type: varType })
+              }
+            }
+          }
+          flattenObject(parsed)
+          if (outputs.length > 0) {
+            return outputs
+          }
+        }
+      } catch (e) {
+        // 不是有效的JSON，返回默认的response变量
+      }
+    }
+    // 默认返回response和statusCode
     return [
-      { name: 'response', type: 'JSON' },
+      { name: 'response', type: 'String' },
       { name: 'statusCode', type: 'Number' },
     ]
   }
@@ -1579,6 +1612,20 @@ const getNodeOutputParams = (node) => {
 
   // 默认情况下显示占位输出参数
   return [{ name: '-', type: '-', isPlaceholder: true }]
+}
+
+// 获取HTTPS/HTTP接口调用节点的输出参数（用于配置面板显示）
+const getApiAutoOutputParams = () => {
+  if (!selectedNode.value || selectedNode.value.type !== 'apiAuto') {
+    return []
+  }
+  return getNodeOutputParams(selectedNode.value)
+}
+
+// 刷新HTTPS/HTTP接口调用节点的输出变量（当response值变化时调用）
+const refreshApiAutoOutputs = () => {
+  // 这个函数会在response值变化时被调用
+  // 输出参数会通过 getApiAutoOutputParams 自动更新
 }
 
 // 初始化条件判断节点配置
@@ -3320,6 +3367,102 @@ onUnmounted(() => {
                         :icon="Delete"
                         @click="removeTableExtractOutputParam($index)"
                       />
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
+            </div>
+          </template>
+
+          <!-- HTTPS/HTTP接口调用节点配置 -->
+          <template v-if="selectedNode.type === 'apiAuto'">
+            <!-- 输入参数 -->
+            <div class="io-section">
+              <div class="io-section-header">
+                <el-icon class="expand-icon"><ArrowDown /></el-icon>
+                <span class="io-section-title">输入</span>
+              </div>
+              <div class="io-section-content">
+                <el-table
+                  :data="[
+                    { name: 'url', type: 'String', required: true, desc: '请求的URL地址', field: 'urlValue' },
+                    { name: 'headers', type: 'String', required: false, desc: '请求头，JSON格式字符串', field: 'headersValue' },
+                    { name: 'body', type: 'String', required: false, desc: '请求体内容', field: 'bodyValue' },
+                    { name: 'param', type: 'String', required: false, desc: 'URL查询参数', field: 'paramValue' },
+                    { name: 'response', type: 'String', required: false, desc: '响应信息示例（用于推断输出变量结构）', field: 'responseValue' }
+                  ]"
+                  size="small"
+                  class="io-table"
+                >
+                  <el-table-column label="变量名" min-width="180">
+                    <template #default="{ row }">
+                      <div class="param-name-cell">
+                        <span v-if="row.required" class="required-mark">*</span>
+                        <span class="param-name-text">{{ row.name }}</span>
+                        <el-tooltip :content="row.desc" placement="top" :show-after="300">
+                          <el-icon class="param-desc-icon"><QuestionFilled /></el-icon>
+                        </el-tooltip>
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="类型" width="100" align="center">
+                    <template #default="{ row }">
+                      <span class="param-type-tag">{{ row.type }}</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="变量值" min-width="200">
+                    <template #default="{ row }">
+                      <div class="param-value-input">
+                        <el-input
+                          v-model="selectedNode.config[row.field]"
+                          :placeholder="row.name === 'response' ? '输入JSON示例以推断输出变量' : '输入或引用参数值'"
+                          size="small"
+                          :type="row.name === 'response' || row.name === 'body' || row.name === 'headers' ? 'textarea' : 'text'"
+                          :rows="row.name === 'response' || row.name === 'body' || row.name === 'headers' ? 3 : 1"
+                          class="param-input-with-btn"
+                          @input="row.name === 'response' && refreshApiAutoOutputs()"
+                        >
+                          <template v-if="row.name !== 'response' && row.name !== 'body' && row.name !== 'headers'" #suffix>
+                            <el-icon class="action-icon link-icon" title="关联节点输出" @click="showVariableSelector(row.field)"><Link /></el-icon>
+                          </template>
+                        </el-input>
+                        <el-icon
+                          v-if="row.name === 'response' || row.name === 'body' || row.name === 'headers'"
+                          class="action-icon link-icon textarea-link-icon"
+                          title="关联节点输出"
+                          @click="showVariableSelector(row.field)"
+                        ><Link /></el-icon>
+                      </div>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
+            </div>
+
+            <!-- 输出参数 -->
+            <div class="io-section">
+              <div class="io-section-header">
+                <el-icon class="expand-icon"><ArrowDown /></el-icon>
+                <span class="io-section-title">输出</span>
+                <span class="output-hint">（根据response示例自动推断）</span>
+              </div>
+              <div class="io-section-content">
+                <el-table
+                  :data="getApiAutoOutputParams()"
+                  size="small"
+                  class="io-table"
+                  empty-text="请输入response示例以推断输出变量"
+                >
+                  <el-table-column label="变量名" min-width="160">
+                    <template #default="{ row }">
+                      <div class="param-name-cell">
+                        <span class="param-name-text">{{ row.name }}</span>
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="类型" width="100" align="center">
+                    <template #default="{ row }">
+                      <span class="param-type-tag">{{ row.type }}</span>
                     </template>
                   </el-table-column>
                 </el-table>
@@ -5396,5 +5539,29 @@ onUnmounted(() => {
   font-size: 11px;
   color: #9ca3af;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* HTTPS/HTTP接口调用节点样式 */
+.output-hint {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-left: 8px;
+}
+
+.textarea-link-icon {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.textarea-link-icon:hover {
+  opacity: 1;
+}
+
+.param-value-input {
+  position: relative;
 }
 </style>
