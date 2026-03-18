@@ -10,6 +10,8 @@ import {
   Monitor,
   ChatDotRound,
   Share,
+  Collection,
+  ArrowRight,
 } from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import { computed, ref } from 'vue'
@@ -22,7 +24,12 @@ const menuItems = [
   { index: '1', title: '首页', icon: 'HomeFilled', route: '/' },
   { index: '2', title: '工作流', icon: 'Share', route: '/app/workflow' },
   { index: '3', title: '任务管理', icon: 'VideoPlay', route: '/app/task' },
-  { index: '4', title: '测评集管理', icon: 'FolderOpened', route: '/app/dataset' },
+  {
+    index: '4',
+    title: '数据准备',
+    icon: 'Collection',
+    children: [{ index: '4-1', title: '测评集管理', icon: 'FolderOpened', route: '/app/dataset' }],
+  },
   { index: '5', title: '环境管理', icon: 'Setting', route: '/app/environment' },
   { index: '6', title: '插件管理', icon: 'Connection', route: '/app/plugin' },
   { index: '7', title: '报告管理', icon: 'DataAnalysis', route: '/app/result' },
@@ -37,6 +44,8 @@ const iconComponents = {
   VideoPlay,
   DataAnalysis,
   Share,
+  Collection,
+  ArrowRight,
 }
 
 const iconColors = {
@@ -48,20 +57,80 @@ const iconColors = {
   VideoPlay: '#3b82f6',
   DataAnalysis: '#06b6d4',
   Share: '#f97316',
+  Collection: '#14b8a6',
+  ArrowRight: '#9ca3af',
 }
 
 const getIcon = (iconName) => iconComponents[iconName]
 const getIconColor = (iconName) => iconColors[iconName]
 
+// 展开的子菜单索引
+const expandedMenus = ref([])
+
+const toggleSubmenu = (index) => {
+  const idx = expandedMenus.value.indexOf(index)
+  if (idx > -1) {
+    expandedMenus.value.splice(idx, 1)
+  } else {
+    expandedMenus.value.push(index)
+  }
+}
+
+const isExpanded = (index) => expandedMenus.value.includes(index)
+
 const activeIndex = computed(() => {
-  // 使用路径前缀匹配，让详情页也能高亮对应的菜单项
-  const item = menuItems.find((m) => route.path === m.route || route.path.startsWith(m.route + '/'))
-  return item ? item.index : '1'
+  // 递归查找匹配的菜单项
+  const findActiveItem = (items) => {
+    for (const item of items) {
+      if (item.route && (route.path === item.route || route.path.startsWith(item.route + '/'))) {
+        return item.index
+      }
+      if (item.children) {
+        const childActive = findActiveItem(item.children)
+        if (childActive) return childActive
+      }
+    }
+    return null
+  }
+  return findActiveItem(menuItems) || '1'
 })
 
+// 计算需要展开的父菜单
+const activeParentIndex = computed(() => {
+  for (const item of menuItems) {
+    if (item.children) {
+      const childActive = item.children.some(
+        (child) => route.path === child.route || route.path.startsWith(child.route + '/'),
+      )
+      if (childActive) return item.index
+    }
+  }
+  return null
+})
+
+// 自动展开包含当前路由的父菜单
+const initExpandedMenus = () => {
+  if (activeParentIndex.value && !expandedMenus.value.includes(activeParentIndex.value)) {
+    expandedMenus.value.push(activeParentIndex.value)
+  }
+}
+initExpandedMenus()
+
 const handleSelect = (index) => {
-  const item = menuItems.find((m) => m.index === index)
-  if (item) {
+  // 查找菜单项（支持嵌套）
+  const findItem = (items) => {
+    for (const item of items) {
+      if (item.index === index) return item
+      if (item.children) {
+        const found = findItem(item.children)
+        if (found) return found
+      }
+    }
+    return null
+  }
+
+  const item = findItem(menuItems)
+  if (item && item.route) {
     router.push(item.route)
   }
 }
@@ -85,21 +154,61 @@ const openChat = () => {
     </div>
 
     <nav class="nav-menu">
-      <div
-        v-for="item in menuItems"
-        :key="item.index"
-        class="nav-item"
-        :class="{ active: activeIndex === item.index }"
-        @click="handleSelect(item.index)"
-      >
-        <div class="nav-indicator"></div>
-        <div class="nav-icon-wrapper" :style="{ background: `${getIconColor(item.icon)}15` }">
-          <el-icon :size="20" :color="getIconColor(item.icon)">
-            <component :is="getIcon(item.icon)" />
-          </el-icon>
+      <template v-for="item in menuItems" :key="item.index">
+        <!-- 有子菜单的情况 -->
+        <div v-if="item.children" class="nav-group">
+          <div
+            class="nav-item has-children"
+            :class="{ active: activeParentIndex === item.index, expanded: isExpanded(item.index) }"
+            @click="toggleSubmenu(item.index)"
+          >
+            <div class="nav-indicator"></div>
+            <div class="nav-icon-wrapper" :style="{ background: `${getIconColor(item.icon)}15` }">
+              <el-icon :size="20" :color="getIconColor(item.icon)">
+                <component :is="getIcon(item.icon)" />
+              </el-icon>
+            </div>
+            <span class="nav-title">{{ item.title }}</span>
+            <el-icon class="expand-arrow" :size="14" :class="{ rotated: isExpanded(item.index) }">
+              <ArrowRight />
+            </el-icon>
+          </div>
+          <Transition name="submenu">
+            <div v-show="isExpanded(item.index)" class="submenu">
+              <div
+                v-for="child in item.children"
+                :key="child.index"
+                class="nav-item submenu-item"
+                :class="{ active: activeIndex === child.index }"
+                @click="handleSelect(child.index)"
+              >
+                <div class="nav-indicator"></div>
+                <div class="nav-icon-wrapper" :style="{ background: `${getIconColor(child.icon)}15` }">
+                  <el-icon :size="18" :color="getIconColor(child.icon)">
+                    <component :is="getIcon(child.icon)" />
+                  </el-icon>
+                </div>
+                <span class="nav-title">{{ child.title }}</span>
+              </div>
+            </div>
+          </Transition>
         </div>
-        <span class="nav-title">{{ item.title }}</span>
-      </div>
+        <!-- 无子菜单的情况 -->
+        <div
+          v-else
+          class="nav-item"
+          :class="{ active: activeIndex === item.index }"
+          @click="handleSelect(item.index)"
+        >
+          <div class="nav-indicator"></div>
+          <div class="nav-icon-wrapper" :style="{ background: `${getIconColor(item.icon)}15` }">
+            <el-icon :size="20" :color="getIconColor(item.icon)">
+              <component :is="getIcon(item.icon)" />
+            </el-icon>
+          </div>
+          <span class="nav-title">{{ item.title }}</span>
+        </div>
+      </template>
     </nav>
 
     <div class="sidebar-footer">
@@ -264,6 +373,71 @@ const openChat = () => {
 .nav-item.active .nav-title {
   color: #4f46e5;
   font-weight: 600;
+}
+
+/* 子菜单展开箭头 */
+.expand-arrow {
+  margin-left: auto;
+  transition: transform 0.3s ease;
+  color: #9ca3af;
+}
+
+.expand-arrow.rotated {
+  transform: rotate(90deg);
+  color: #6366f1;
+}
+
+/* 子菜单容器 */
+.submenu {
+  margin-top: 4px;
+  padding-left: 12px;
+  overflow: hidden;
+}
+
+.submenu-item {
+  padding-left: 10px;
+}
+
+.submenu-item .nav-icon-wrapper {
+  width: 32px;
+  height: 32px;
+}
+
+.submenu-item .nav-title {
+  font-size: 13px;
+}
+
+/* 子菜单展开动画 */
+.submenu-enter-active,
+.submenu-leave-active {
+  transition: all 0.3s ease;
+}
+
+.submenu-enter-from,
+.submenu-leave-to {
+  opacity: 0;
+  max-height: 0;
+  transform: translateY(-10px);
+}
+
+.submenu-enter-to,
+.submenu-leave-from {
+  opacity: 1;
+  max-height: 200px;
+  transform: translateY(0);
+}
+
+/* 有子菜单的菜单项 */
+.nav-item.has-children {
+  cursor: pointer;
+}
+
+.nav-item.has-children.expanded {
+  background: #f3f4f6;
+}
+
+.nav-item.has-children.expanded .nav-title {
+  color: #374151;
 }
 
 .sidebar-footer {
