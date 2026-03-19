@@ -160,7 +160,8 @@ const addNodeToLoopBodyInline = (loopBodyNode, type) => {
   if (!loopBodyNode.innerConnections) loopBodyNode.innerConnections = []
 
   // 计算新节点位置（使用与外部节点相同的尺寸）
-  const baseX = 40
+  // 从画布左边缘开始，留出端口的空间
+  const baseX = 10
   const baseY = 30
   const nodeWidth = 220 // 与外部节点一致
   const nodeGap = 30
@@ -300,8 +301,8 @@ const addNodeToLoopBodyFromPort = (type) => {
   if (!loopBodyNode.innerNodes) loopBodyNode.innerNodes = []
   if (!loopBodyNode.innerConnections) loopBodyNode.innerConnections = []
 
-  const baseX = 80 // 画布内起始位置
-  const baseY = 200
+  const baseX = 10 // 从画布左边缘开始
+  const baseY = 100
   const nodeWidth = 140
 
   // 计算新节点位置（在最后一个节点右侧）
@@ -449,6 +450,7 @@ const getLoopBodyConnectionPath = (conn, loopBodyNode, part) => {
   // 获取内部画布的偏移量
   const canvasSize = getInnerCanvasSize(loopBodyNode)
   const offsetX = canvasSize.offsetX || 0
+  const offsetY = canvasSize.offsetY || 0
 
   // 内部节点尺寸（与外部节点一致）
   const nodeWidth = 220
@@ -470,10 +472,33 @@ const getLoopBodyConnectionPath = (conn, loopBodyNode, part) => {
 
   // 处理特殊源：__start__ 代表从循环体左侧端口开始的连线
   if (conn.sourceId === '__start__') {
-    // 连线起点应该是内部画布坐标系的 x=0 处
-    // 由于内部画布有 transform 偏移，连线需要从 -offsetX 开始才能在视觉上对齐画布左侧
-    x1 = -offsetX
-    y1 = targetNode.y + getInnerNodeHeight(targetNode) / 2
+    // 计算循环体左侧端口在 SVG 坐标系中的位置
+    const loopBodySize = getLoopBodyNodeSize(loopBodyNode)
+    const loopBodyHeight = parseFloat(loopBodySize.height)
+    const headerHeight = 40
+
+    // y1 是循环体左侧端口在 SVG 坐标系中的位置
+    // 循环体左侧端口位于循环体高度的 50%
+    const leftPortYRelativeToContainer = loopBodyHeight / 2 - headerHeight
+    y1 = leftPortYRelativeToContainer - offsetY
+
+    // x1 是循环体左侧端口在 SVG 坐标系中的位置
+    // 通过 DOM 获取端口实际位置来计算
+    const loopBodyElement = document.querySelector(`[data-node-id="${loopBodyNode.id}"]`)
+    if (loopBodyElement) {
+      const leftPortElement = loopBodyElement.querySelector('.loop-body-canvas-port-output')
+      const svgElement = loopBodyElement.querySelector('.loop-body-connections-bottom')
+      if (leftPortElement && svgElement) {
+        const portRect = leftPortElement.getBoundingClientRect()
+        const svgRect = svgElement.getBoundingClientRect()
+        // 端口中心相对于 SVG 左边缘的位置
+        x1 = (portRect.left + portRect.width / 2) - svgRect.left
+      } else {
+        x1 = 0
+      }
+    } else {
+      x1 = 0
+    }
   } else {
     const sourceNode = innerNodes.find((n) => n.id === conn.sourceId)
     if (!sourceNode) return ''
@@ -482,12 +507,16 @@ const getLoopBodyConnectionPath = (conn, loopBodyNode, part) => {
   }
 
   const x2 = targetNode.x
+  // y2 是内部节点输入端口的 Y 位置
   const y2 = targetNode.y + getInnerNodeHeight(targetNode) / 2
 
   const midX = (x1 + x2) / 2
   const path = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`
 
-  if (part === 'start') {
+  if (part === 'full') {
+    // 返回完整路径（用于 __start__ 类型的连线，显示在顶层）
+    return path
+  } else if (part === 'start') {
     const controlX = (x1 + midX) / 2
     return `M ${x1} ${y1} C ${controlX} ${y1}, ${controlX} ${y1}, ${midX} ${(y1 + y2) / 2}`
   } else {
@@ -718,8 +747,9 @@ const getInnerCanvasSize = (node) => {
   return {
     width: canvasWidth,
     height: canvasHeight,
-    offsetX: minX < Infinity ? -minX + 20 : 0,
-    offsetY: minY < Infinity ? -minY + 20 : 0,
+    // 移除偏移，让画布从边缘开始
+    offsetX: minX < Infinity ? -minX : 0,
+    offsetY: minY < Infinity ? -minY : 0,
   }
 }
 
@@ -731,14 +761,12 @@ const getLoopBodyNodeSize = (node) => {
   const baseWidth = 550
   const baseHeight = 350
 
-  // 边距
-  const padding = 20
   // 标题栏高度
   const headerHeight = 40
 
-  // 计算最终尺寸：画布尺寸 + 边距（移除了左侧按钮宽度）
-  const finalWidth = Math.max(baseWidth, canvasSize.width + padding * 2)
-  const finalHeight = Math.max(baseHeight, canvasSize.height + padding + headerHeight)
+  // 画布直接顶满整个循环体宽度，不保留内边距
+  const finalWidth = Math.max(baseWidth, canvasSize.width)
+  const finalHeight = Math.max(baseHeight, canvasSize.height + headerHeight)
 
   return {
     width: finalWidth + 'px',
@@ -2182,6 +2210,10 @@ const selectNode = (node, event) => {
   if (node.type === 'loop') {
     initLoopConfig()
   }
+  // 初始化裁判模型节点配置
+  if (node.type === 'judgeModel') {
+    initJudgeModelConfig()
+  }
 }
 
 // 选中连线
@@ -2417,6 +2449,47 @@ const getNodeInputParams = (node) => {
       })
     }
     return params
+  }
+
+  // 裁判模型节点：固定的输入参数
+  if (node.type === 'judgeModel') {
+    return [
+      {
+        name: 'model',
+        type: 'String',
+        required: true,
+        description: '评估使用的模型',
+        inputType: 'select',
+        options: ['DeepSeek R1-32B'],
+      },
+      {
+        name: 'prompt',
+        type: 'String',
+        required: true,
+        description: '用户的指令或定义的评估规则',
+        inputType: 'textarea',
+        defaultValue: `你是一个专业的评估助手，请根据以下标准对内容进行评估：
+
+评估标准：
+1. 准确性：内容是否准确无误
+2. 完整性：内容是否完整覆盖了要求
+3. 清晰性：内容是否表达清晰易懂
+
+请对输入内容进行评估，并给出评分（1-10分）和详细理由。`,
+      },
+      {
+        name: 'to_eval',
+        type: 'String',
+        required: true,
+        description: '待评估的内容',
+      },
+      {
+        name: 'ref_answer',
+        type: 'String',
+        required: false,
+        description: '参考答案（可选）',
+      },
+    ]
   }
 
   // 其他节点：默认输入参数
@@ -2855,6 +2928,24 @@ const initTextCleanConfig = () => {
     selectedNode.value.config.normalizeNewlines = true
     selectedNode.value.config.trimWhitespace = true
     // 输出格式根据输入类型自动确定，无需手动配置
+  }
+}
+
+// 初始化裁判模型节点配置
+const initJudgeModelConfig = () => {
+  if (!selectedNode.value) return
+  if (!selectedNode.value.config.model) {
+    selectedNode.value.config.model = 'DeepSeek R1-32B'
+  }
+  if (!selectedNode.value.config.prompt) {
+    selectedNode.value.config.prompt = `你是一个专业的评估助手，请根据以下标准对内容进行评估：
+
+评估标准：
+1. 准确性：内容是否准确无误
+2. 完整性：内容是否完整覆盖了要求
+3. 清晰性：内容是否表达清晰易懂
+
+请对输入内容进行评估，并给出评分（1-10分）和详细理由。`
   }
 }
 
@@ -3860,7 +3951,7 @@ onUnmounted(() => {
                         transformOrigin: '0 0',
                       }"
                     >
-                      <!-- 连线层（底层） -->
+                      <!-- 连线层（底层）- 只渲染非 __start__ 类型的连线的 start 部分 -->
                       <svg class="loop-body-connections-bottom" :width="getInnerCanvasSize(node).width" :height="getInnerCanvasSize(node).height">
                         <defs>
                           <marker id="lb-arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
@@ -3873,8 +3964,9 @@ onUnmounted(() => {
                             <path d="M 0 0 L 5 3 L 0 6" fill="none" stroke="#6366f1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6" />
                           </marker>
                         </defs>
+                        <!-- 只渲染非 __start__ 类型的连线 -->
                         <path
-                          v-for="conn in node.innerConnections || []"
+                          v-for="conn in (node.innerConnections || []).filter(c => c.sourceId !== '__start__')"
                           :key="conn.id + '-start'"
                           :d="getLoopBodyConnectionPath(conn, node, 'start')"
                           class="loop-body-connection-path"
@@ -3968,7 +4060,7 @@ onUnmounted(() => {
                         </div>
                       </div>
 
-                      <!-- 连线层（顶层） -->
+                      <!-- 连线层（顶层）- 渲染所有连线的 end 部分，以及 __start__ 类型连线的完整路径 -->
                       <svg class="loop-body-connections-top" :width="getInnerCanvasSize(node).width" :height="getInnerCanvasSize(node).height">
                         <defs>
                           <marker id="lb-arrowhead-top" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
@@ -3978,8 +4070,17 @@ onUnmounted(() => {
                             <path d="M 0 0 L 5 3 L 0 6" fill="none" stroke="#22d3ee" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
                           </marker>
                         </defs>
+                        <!-- 渲染 __start__ 类型连线的完整路径 -->
                         <path
-                          v-for="conn in node.innerConnections || []"
+                          v-for="conn in (node.innerConnections || []).filter(c => c.sourceId === '__start__')"
+                          :key="conn.id + '-full'"
+                          :d="getLoopBodyConnectionPath(conn, node, 'full')"
+                          class="loop-body-connection-path"
+                          :class="{ selected: node.selectedInnerConnection?.id === conn.id }"
+                        />
+                        <!-- 渲染非 __start__ 类型连线的 end 部分 -->
+                        <path
+                          v-for="conn in (node.innerConnections || []).filter(c => c.sourceId !== '__start__')"
                           :key="conn.id + '-end'"
                           :d="getLoopBodyConnectionPath(conn, node, 'end')"
                           class="loop-body-connection-path"
@@ -4704,6 +4805,126 @@ onUnmounted(() => {
               <div class="io-section-content">
                 <el-table
                   :data="[{ name: 'current_item', type: 'Any', desc: '当前循环项' }, { name: 'current_index', type: 'Number', desc: '当前循环索引' }]"
+                  size="small"
+                  class="io-table"
+                >
+                  <el-table-column label="变量名" min-width="160">
+                    <template #default="{ row }">
+                      <div class="param-name-cell">
+                        <span class="param-name-text">{{ row.name }}</span>
+                        <el-tooltip :content="row.desc" placement="top" :show-after="300">
+                          <el-icon class="param-desc-icon"><QuestionFilled /></el-icon>
+                        </el-tooltip>
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="类型" width="100" align="center">
+                    <template #default="{ row }">
+                      <span class="param-type-tag">{{ row.type }}</span>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
+            </div>
+          </template>
+
+          <!-- 裁判模型节点配置 -->
+          <template v-if="selectedNode.type === 'judgeModel'">
+            <!-- 输入参数 -->
+            <div class="io-section">
+              <div class="io-section-header">
+                <el-icon class="expand-icon"><ArrowDown /></el-icon>
+                <span class="io-section-title">输入</span>
+              </div>
+              <div class="io-section-content">
+                <el-table
+                  :data="[
+                    { name: 'model', type: 'String', required: true, desc: '评估使用的模型', field: 'model', inputType: 'select', options: ['DeepSeek R1-32B'] },
+                    { name: 'prompt', type: 'String', required: true, desc: '用户的指令或定义的评估规则', field: 'prompt', inputType: 'textarea' },
+                    { name: 'to_eval', type: 'String', required: true, desc: '待评估的内容', field: 'toEval' },
+                    { name: 'ref_answer', type: 'String', required: false, desc: '参考答案（可选）', field: 'refAnswer' }
+                  ]"
+                  size="small"
+                  class="io-table"
+                >
+                  <el-table-column label="变量名" min-width="120">
+                    <template #default="{ row }">
+                      <div class="param-name-cell">
+                        <span v-if="row.required" class="required-mark">*</span>
+                        <span class="param-name-text">{{ row.name }}</span>
+                        <el-tooltip :content="row.desc" placement="top" :show-after="300">
+                          <el-icon class="param-desc-icon"><QuestionFilled /></el-icon>
+                        </el-tooltip>
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="类型" width="100" align="center">
+                    <template #default="{ row }">
+                      <span class="param-type-tag">{{ row.type }}</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="变量值" min-width="200">
+                    <template #default="{ row }">
+                      <!-- select 类型：下拉框 + 关联选择 -->
+                      <div v-if="row.inputType === 'select'" class="param-value-input">
+                        <el-select
+                          v-model="selectedNode.config[row.field]"
+                          placeholder="选择模型"
+                          size="small"
+                          class="param-select-with-btn"
+                        >
+                          <el-option
+                            v-for="opt in row.options"
+                            :key="opt"
+                            :label="opt"
+                            :value="opt"
+                          />
+                        </el-select>
+                        <el-icon class="action-icon link-icon" title="关联节点输出" @click="showVariableSelector(row.field)"><Link /></el-icon>
+                      </div>
+                      <!-- textarea 类型：文本域 + 关联选择 -->
+                      <div v-else-if="row.inputType === 'textarea'" class="param-value-input textarea-input">
+                        <el-input
+                          v-model="selectedNode.config[row.field]"
+                          type="textarea"
+                          :rows="6"
+                          placeholder="输入评估规则"
+                          size="small"
+                          class="param-textarea-with-btn"
+                        />
+                        <el-icon class="action-icon link-icon textarea-link-icon" title="关联节点输出" @click="showVariableSelector(row.field)"><Link /></el-icon>
+                      </div>
+                      <!-- 其他类型：输入框 + 关联选择 -->
+                      <div v-else class="param-value-input">
+                        <el-input
+                          v-model="selectedNode.config[row.field]"
+                          placeholder="输入或引用参数值"
+                          size="small"
+                          class="param-input-with-btn"
+                        >
+                          <template #suffix>
+                            <el-icon class="action-icon link-icon" title="关联节点输出" @click="showVariableSelector(row.field)"><Link /></el-icon>
+                          </template>
+                        </el-input>
+                      </div>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
+            </div>
+
+            <!-- 输出参数 -->
+            <div class="io-section">
+              <div class="io-section-header">
+                <el-icon class="expand-icon"><ArrowDown /></el-icon>
+                <span class="io-section-title">输出</span>
+              </div>
+              <div class="io-section-content">
+                <el-table
+                  :data="[
+                    { name: 'score', type: 'Number', desc: '评估分数' },
+                    { name: 'reason', type: 'String', desc: '评估理由' }
+                  ]"
                   size="small"
                   class="io-table"
                 >
@@ -5931,6 +6152,7 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   pointer-events: none;
+  overflow: visible;
 }
 
 .loop-body-connections-bottom {
